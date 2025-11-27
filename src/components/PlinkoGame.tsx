@@ -369,7 +369,19 @@ export const PlinkoGame = () => {
       <div className="flex flex-col gap-4">
         <Scoreboard names={names} scores={scores} />
         <div className="parchment-bg rounded-xl p-4 rope-border">
-          <h3 className="font-pirate text-xl text-wood-dark mb-2">Edit Crew Names</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-pirate text-xl text-wood-dark">Edit Crew Names</h3>
+            <button
+              onClick={() => {
+                const shuffled = [...names].sort(() => Math.random() - 0.5);
+                setNames(shuffled);
+              }}
+              disabled={isDropping}
+              className="text-sm px-3 py-1 rounded bg-wood-dark text-parchment font-pirate hover:bg-wood-mid transition-colors disabled:opacity-50"
+            >
+              🔀 Shuffle
+            </button>
+          </div>
           <div className="grid grid-cols-3 gap-2">
             {names.map((name, index) => (
               <input
