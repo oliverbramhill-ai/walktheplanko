@@ -3,9 +3,11 @@ import Matter from 'matter-js';
 import confetti from 'canvas-confetti';
 import { usePlinkoSounds } from '@/hooks/usePlinkoSounds';
 import { DropZones } from './DropZones';
-import { Scoreboard } from './Scoreboard';
+import { Leaderboard } from './Leaderboard';
 import { WinnerBanner } from './WinnerBanner';
 import { NameSlots } from './NameSlots';
+
+const LIFETIME_WINS_KEY = 'walkThePlanko_lifetimeWins';
 
 const DEFAULT_NAMES = [
   'Oliver', 'David', 'Alina', 'Camille', 'James', 'Adri', 'Ross', 'Luke', 'Romain'
@@ -28,12 +30,18 @@ export const PlinkoGame = () => {
   const [dropCounts, setDropCounts] = useState<number[]>([3, 3, 3, 3, 3]);
   const [isDropping, setIsDropping] = useState(false);
   const [winner, setWinner] = useState<string | null>(null);
+  const [latestWinner, setLatestWinner] = useState<string | null>(null);
   const [activeBalls, setActiveBalls] = useState(0);
   const [isShaking, setIsShaking] = useState(false);
+  const [lifetimeWins, setLifetimeWins] = useState<Record<string, number>>(() => {
+    const stored = localStorage.getItem(LIFETIME_WINS_KEY);
+    return stored ? JSON.parse(stored) : {};
+  });
   
   const sounds = usePlinkoSounds();
   const ballCountRef = useRef(0);
   const scoresRef = useRef<Record<string, number>>({});
+  const totalBallsRef = useRef(0);
 
   const initializeScores = useCallback(() => {
     const initialScores: Record<string, number> = {};
@@ -171,6 +179,16 @@ export const PlinkoGame = () => {
     
     if (winnerName && maxScore > 0) {
       setWinner(winnerName);
+      setLatestWinner(winnerName);
+      
+      // Update lifetime wins
+      const newLifetimeWins = {
+        ...lifetimeWins,
+        [winnerName]: (lifetimeWins[winnerName] || 0) + 1,
+      };
+      setLifetimeWins(newLifetimeWins);
+      localStorage.setItem(LIFETIME_WINS_KEY, JSON.stringify(newLifetimeWins));
+      
       sounds.playWinner();
       sounds.playArrr();
       
@@ -208,7 +226,7 @@ export const PlinkoGame = () => {
     if (!canvasRef.current) return;
 
     const engine = Matter.Engine.create({
-      gravity: { x: 0, y: 1 },
+      gravity: { x: 0, y: 0.65 }, // Reduced gravity for slower, more dramatic balls
     });
     
     const render = Matter.Render.create({
@@ -246,9 +264,9 @@ export const PlinkoGame = () => {
     if (!engineRef.current) return;
     
     const ball = Matter.Bodies.circle(x + (Math.random() - 0.5) * 20, -10, BALL_RADIUS, {
-      restitution: 0.6,
-      friction: 0.1,
-      frictionAir: 0.01,
+      restitution: 0.5,
+      friction: 0.15,
+      frictionAir: 0.015, // Slightly more air resistance for slower movement
       render: {
         fillStyle: '#2a2a2a',
         strokeStyle: '#4a4a4a',
@@ -261,6 +279,21 @@ export const PlinkoGame = () => {
     ballCountRef.current++;
     setActiveBalls(ballCountRef.current);
   };
+  
+  // Slow-motion effect for final balls
+  useEffect(() => {
+    if (!engineRef.current) return;
+    
+    const engine = engineRef.current;
+    
+    if (activeBalls <= 4 && activeBalls > 0 && isDropping) {
+      // Gradually slow down as fewer balls remain
+      const slowFactor = activeBalls === 1 ? 0.4 : activeBalls === 2 ? 0.6 : activeBalls <= 4 ? 0.8 : 1;
+      engine.timing.timeScale = slowFactor;
+    } else {
+      engine.timing.timeScale = 1;
+    }
+  }, [activeBalls, isDropping]);
 
   const handleDrop = () => {
     if (isDropping) return;
@@ -282,12 +315,18 @@ export const PlinkoGame = () => {
     ];
     
     let totalBalls = 0;
+    const totalBallCount = dropCounts.reduce((sum, c) => sum + c, 0);
+    totalBallsRef.current = totalBallCount;
+    
     dropCounts.forEach((count, zoneIndex) => {
       for (let i = 0; i < count; i++) {
+        // Stagger release with more delay between zones
+        const zoneDelay = zoneIndex * 400;
+        const ballDelay = i * 350;
         setTimeout(() => {
           dropBall(dropPositions[zoneIndex]);
           sounds.playDrop();
-        }, totalBalls * 200 + Math.random() * 100);
+        }, zoneDelay + ballDelay + Math.random() * 150);
         totalBalls++;
       }
     });
@@ -333,7 +372,7 @@ export const PlinkoGame = () => {
                 background: 'linear-gradient(180deg, #1a3a5c 0%, #0f2942 100%)',
               }}
             />
-            <NameSlots names={names} scores={scores} />
+            <NameSlots names={names} scores={scores} lifetimeWins={lifetimeWins} />
           </div>
           
           {/* Decorative elements */}
@@ -367,7 +406,7 @@ export const PlinkoGame = () => {
       </div>
       
       <div className="flex flex-col gap-4">
-        <Scoreboard names={names} scores={scores} />
+        <Leaderboard names={names} lifetimeWins={lifetimeWins} latestWinner={latestWinner} />
         <div className="parchment-bg rounded-xl p-4 rope-border">
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-pirate text-xl text-wood-dark">Edit Crew Names</h3>
