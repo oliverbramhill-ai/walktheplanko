@@ -42,6 +42,7 @@ export const PlinkoGame = () => {
   const ballCountRef = useRef(0);
   const scoresRef = useRef<Record<string, number>>({});
   const totalBallsRef = useRef(0);
+  const landedBallsRef = useRef<Set<number>>(new Set()); // Track balls that have already landed
 
   const initializeScores = useCallback(() => {
     const initialScores: Record<string, number> = {};
@@ -55,6 +56,13 @@ export const PlinkoGame = () => {
   useEffect(() => {
     initializeScores();
   }, [initializeScores]);
+  
+  // Persist lifetimeWins when it changes (except on initial load)
+  useEffect(() => {
+    if (Object.keys(lifetimeWins).length > 0) {
+      localStorage.setItem(LIFETIME_WINS_KEY, JSON.stringify(lifetimeWins));
+    }
+  }, [lifetimeWins]);
 
   const createPegs = (world: Matter.World) => {
     const pegs: Matter.Body[] = [];
@@ -137,6 +145,12 @@ export const PlinkoGame = () => {
         
         if (labels.includes('ball') && labels.includes('bottom')) {
           const ball = pair.bodyA.label === 'ball' ? pair.bodyA : pair.bodyB;
+          const ballId = ball.id;
+          
+          // Prevent processing the same ball multiple times
+          if (landedBallsRef.current.has(ballId)) return;
+          landedBallsRef.current.add(ballId);
+          
           const slotIndex = Math.floor(ball.position.x / SLOT_WIDTH);
           const clampedIndex = Math.max(0, Math.min(8, slotIndex));
           const name = names[clampedIndex];
@@ -300,8 +314,10 @@ export const PlinkoGame = () => {
     
     setIsDropping(true);
     setWinner(null);
+    setLatestWinner(null);
     initializeScores();
     ballCountRef.current = 0;
+    landedBallsRef.current.clear(); // Reset landed balls tracker
     
     setIsShaking(true);
     setTimeout(() => setIsShaking(false), 500);
