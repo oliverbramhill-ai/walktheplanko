@@ -16,6 +16,13 @@ const BOARD_HEIGHT = 600;
 const PEG_RADIUS = 6;
 const BALL_RADIUS = 10;
 
+// Grid configuration - use 92% of board width
+const GRID_MARGIN = BOARD_WIDTH * 0.04; // 4% margin on each side
+const GRID_WIDTH = BOARD_WIDTH - (GRID_MARGIN * 2);
+const PEG_COLS = 11; // Odd number for center alignment
+const PEG_SPACING = GRID_WIDTH / (PEG_COLS - 1);
+const DROP_ZONE_COUNT = 5;
+
 export const PlinkoGame = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<Matter.Engine | null>(null);
@@ -76,17 +83,18 @@ export const PlinkoGame = () => {
 
   const createPegs = (world: Matter.World) => {
     const pegs: Matter.Body[] = [];
-    const rows = 10;
-    const startY = 100;
-    const rowSpacing = 42;
-    const pegSpacing = BOARD_WIDTH / 10;
+    const rows = 12;
+    const startY = 90;
+    const rowSpacing = PEG_SPACING * 0.866; // Hexagonal vertical spacing (sqrt(3)/2)
     
     for (let row = 0; row < rows; row++) {
-      const cols = row % 2 === 0 ? 9 : 8;
-      const offsetX = row % 2 === 0 ? pegSpacing : pegSpacing * 1.5;
+      // Alternate between full columns and offset columns
+      const isOffsetRow = row % 2 === 1;
+      const cols = isOffsetRow ? PEG_COLS - 1 : PEG_COLS;
+      const rowOffset = isOffsetRow ? PEG_SPACING / 2 : 0;
       
       for (let col = 0; col < cols; col++) {
-        const x = offsetX + col * pegSpacing;
+        const x = GRID_MARGIN + rowOffset + col * PEG_SPACING;
         const y = startY + row * rowSpacing;
         
         const peg = Matter.Bodies.circle(x, y, PEG_RADIUS, {
@@ -106,20 +114,25 @@ export const PlinkoGame = () => {
     return pegs;
   };
 
+  // Calculate drop zone positions centered over peg columns
+  const getDropPositions = () => {
+    const positions: number[] = [];
+    const step = (PEG_COLS - 1) / (DROP_ZONE_COUNT - 1);
+    for (let i = 0; i < DROP_ZONE_COUNT; i++) {
+      const pegCol = Math.round(i * step);
+      positions.push(GRID_MARGIN + pegCol * PEG_SPACING);
+    }
+    return positions;
+  };
+
   const createSpinners = (world: Matter.World) => {
     if (!spinnersEnabled) return [];
     
     const spinners: Matter.Body[] = [];
-    const dropPositions = [
-      BOARD_WIDTH * 0.15,
-      BOARD_WIDTH * 0.35,
-      BOARD_WIDTH * 0.5,
-      BOARD_WIDTH * 0.65,
-      BOARD_WIDTH * 0.85,
-    ];
+    const dropPositions = getDropPositions();
     
     dropPositions.forEach((x) => {
-      const spinner = Matter.Bodies.rectangle(x, 60, 40, 8, {
+      const spinner = Matter.Bodies.rectangle(x, 55, 35, 7, {
         isStatic: true,
         restitution: 0.8,
         friction: 0.1,
@@ -387,13 +400,7 @@ export const PlinkoGame = () => {
     setIsShaking(true);
     setTimeout(() => setIsShaking(false), 500);
     
-    const dropPositions = [
-      BOARD_WIDTH * 0.15,
-      BOARD_WIDTH * 0.35,
-      BOARD_WIDTH * 0.5,
-      BOARD_WIDTH * 0.65,
-      BOARD_WIDTH * 0.85,
-    ];
+    const dropPositions = getDropPositions();
     
     const maxWaves = Math.max(...dropCounts);
     let waveIndex = 0;
