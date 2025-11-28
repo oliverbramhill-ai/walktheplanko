@@ -46,6 +46,7 @@ export const PlinkoGame = () => {
   const landedBallsRef = useRef(0);
   const totalBallsToDropRef = useRef(0);
   const scoresRef = useRef<Record<string, number>>({});
+  const hasAnnouncedWinnerRef = useRef(false);
 
   // Calculate slot widths with Lucky Sailor adjustment
   const getSlotWidths = useCallback(() => {
@@ -210,6 +211,13 @@ export const PlinkoGame = () => {
         
         if (labels.includes('ball') && labels.includes('bottom')) {
           const ball = pair.bodyA.label === 'ball' ? pair.bodyA : pair.bodyB;
+          const landedBall = ball as any;
+          
+          // Ignore repeated bottom hits from the same ball
+          if (landedBall.hasLanded) {
+            return;
+          }
+          landedBall.hasLanded = true;
           
           const slotWidths = getSlotWidths();
           let accumulatedWidth = 0;
@@ -258,6 +266,9 @@ export const PlinkoGame = () => {
   };
 
   const checkWinner = () => {
+    // Don't announce twice
+    if (hasAnnouncedWinnerRef.current) return;
+    
     const currentScores = scoresRef.current;
     let maxScore = 0;
     let winnerName = '';
@@ -270,6 +281,7 @@ export const PlinkoGame = () => {
     });
     
     if (winnerName && maxScore > 0) {
+      hasAnnouncedWinnerRef.current = true;
       setWinner(winnerName);
       sounds.playWinner();
       sounds.playArrr();
@@ -386,6 +398,7 @@ export const PlinkoGame = () => {
     
     setIsDropping(true);
     setWinner(null);
+    hasAnnouncedWinnerRef.current = false;
     initializeScores();
     ballCountRef.current = 0;
     landedBallsRef.current = 0;
@@ -441,6 +454,7 @@ export const PlinkoGame = () => {
     ballCountRef.current = 0;
     landedBallsRef.current = 0;
     totalBallsToDropRef.current = 0;
+    hasAnnouncedWinnerRef.current = false;
     setActiveBalls(0);
     setIsDropping(false);
     setWinner(null);
