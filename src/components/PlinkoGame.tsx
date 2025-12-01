@@ -84,7 +84,7 @@ export const PlinkoGame = () => {
 
   const createPegs = (world: Matter.World) => {
     const pegs: Matter.Body[] = [];
-    const rows = 12;
+    const rows = 8;
     const startY = 90;
     const rowSpacing = PEG_SPACING * 0.866; // Hexagonal vertical spacing (sqrt(3)/2)
     
