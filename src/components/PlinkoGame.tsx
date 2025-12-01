@@ -16,12 +16,23 @@ const BOARD_HEIGHT = 600;
 const PEG_RADIUS = 6;
 const BALL_RADIUS = 10;
 
-// Grid configuration - use 92% of board width
-const GRID_MARGIN = BOARD_WIDTH * 0.04; // 4% margin on each side
+// Grid configuration - reduced margin for edge coverage
+const GRID_MARGIN = BOARD_WIDTH * 0.02; // 2% margin on each side
 const GRID_WIDTH = BOARD_WIDTH - (GRID_MARGIN * 2);
-const PEG_COLS = 11; // Odd number for center alignment
+const PEG_COLS = 13; // More columns for denser coverage
 const PEG_SPACING = GRID_WIDTH / (PEG_COLS - 1);
-const DROP_ZONE_COUNT = 5;
+const PEG_ROWS = 12;
+
+// Helper to get slot center positions from slot widths
+const getSlotCenters = (slotWidths: number[], boardWidth: number): number[] => {
+  let acc = 0;
+  return slotWidths.map((percentageWidth) => {
+    const widthPx = (percentageWidth / 100) * boardWidth;
+    const center = acc + widthPx / 2;
+    acc += widthPx;
+    return center;
+  });
+};
 
 export const PlinkoGame = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -32,7 +43,7 @@ export const PlinkoGame = () => {
   
   const [names, setNames] = useState<string[]>(DEFAULT_NAMES);
   const [scores, setScores] = useState<Record<string, number>>({});
-  const [dropCounts, setDropCounts] = useState<number[]>([3, 3, 3, 3, 3]);
+  const [dropCounts, setDropCounts] = useState<number[]>(() => DEFAULT_NAMES.map(() => 2));
   const [isDropping, setIsDropping] = useState(false);
   const [winner, setWinner] = useState<string | null>(null);
   const [activeBalls, setActiveBalls] = useState(0);
@@ -84,9 +95,8 @@ export const PlinkoGame = () => {
 
   const createPegs = (world: Matter.World) => {
     const pegs: Matter.Body[] = [];
-    const PEG_ROWS = 8;
-    const startY = 70;
-    const rowSpacing = PEG_SPACING * 0.95;
+    const startY = 60;
+    const rowSpacing = (BOARD_HEIGHT - 150) / PEG_ROWS;
     
     for (let row = 0; row < PEG_ROWS; row++) {
       const isOffsetRow = row % 2 === 1;
@@ -99,7 +109,7 @@ export const PlinkoGame = () => {
         
         const peg = Matter.Bodies.circle(x, y, PEG_RADIUS, {
           isStatic: true,
-          restitution: 0.6,
+          restitution: 0.7,
           friction: 0.05,
           render: {
             fillStyle: '#C4A45F',
@@ -114,16 +124,48 @@ export const PlinkoGame = () => {
     return pegs;
   };
 
-  // Calculate drop zone positions centered over peg columns
-  const getDropPositions = () => {
-    const positions: number[] = [];
-    const step = (PEG_COLS - 1) / (DROP_ZONE_COUNT - 1);
-    for (let i = 0; i < DROP_ZONE_COUNT; i++) {
-      const pegCol = Math.round(i * step);
-      positions.push(GRID_MARGIN + pegCol * PEG_SPACING);
+  // Add edge guard pegs along both walls to prevent wall-hugging
+  const addEdgePegs = (world: Matter.World) => {
+    const edgePegs: Matter.Body[] = [];
+    const startY = 60;
+    const rowSpacing = (BOARD_HEIGHT - 150) / PEG_ROWS;
+    const edgeOffset = 12; // Distance from wall
+    
+    for (let row = 0; row < PEG_ROWS; row++) {
+      // Left edge peg
+      const leftPeg = Matter.Bodies.circle(edgeOffset, startY + row * rowSpacing, PEG_RADIUS, {
+        isStatic: true,
+        restitution: 0.7,
+        friction: 0.05,
+        render: {
+          fillStyle: '#C4A45F',
+        },
+        label: 'peg',
+      });
+      edgePegs.push(leftPeg);
+      
+      // Right edge peg
+      const rightPeg = Matter.Bodies.circle(BOARD_WIDTH - edgeOffset, startY + row * rowSpacing, PEG_RADIUS, {
+        isStatic: true,
+        restitution: 0.7,
+        friction: 0.05,
+        render: {
+          fillStyle: '#C4A45F',
+        },
+        label: 'peg',
+      });
+      edgePegs.push(rightPeg);
     }
-    return positions;
+    
+    Matter.Composite.add(world, edgePegs);
+    return edgePegs;
   };
+
+  // Calculate drop zone positions aligned to slot centers
+  const getDropPositions = useCallback(() => {
+    const slotWidths = getSlotWidths();
+    return getSlotCenters(slotWidths, BOARD_WIDTH);
+  }, [getSlotWidths]);
   const createSlotWalls = (world: Matter.World) => {
     const walls: Matter.Body[] = [];
     const slotTop = BOARD_HEIGHT - 80;
@@ -305,6 +347,7 @@ export const PlinkoGame = () => {
     const runner = Matter.Runner.create();
 
     createPegs(engine.world);
+    addEdgePegs(engine.world);
     createSlotWalls(engine.world);
     setupCollisionDetection(engine);
 
@@ -418,13 +461,17 @@ export const PlinkoGame = () => {
 
   const addName = () => {
     if (names.length >= 10) return;
-    setNames([...names, `Crew ${names.length + 1}`]);
+    const newNames = [...names, `Crew ${names.length + 1}`];
+    setNames(newNames);
+    setDropCounts([...dropCounts, 2]);
   };
 
   const removeName = (index: number) => {
     if (names.length <= 4) return;
     const newNames = names.filter((_, i) => i !== index);
+    const newDropCounts = dropCounts.filter((_, i) => i !== index);
     setNames(newNames);
+    setDropCounts(newDropCounts);
     if (luckySailor === names[index]) {
       setLuckySailor(null);
     }
@@ -441,6 +488,9 @@ export const PlinkoGame = () => {
           dropCounts={dropCounts} 
           setDropCounts={setDropCounts} 
           disabled={isDropping}
+          names={names}
+          dropPositions={getDropPositions()}
+          boardWidth={BOARD_WIDTH}
         />
         
         <div className={`relative ${isShaking ? 'animate-shake' : ''}`}>
