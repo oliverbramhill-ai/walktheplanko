@@ -28,7 +28,7 @@ export const PlinkoGame = () => {
   const engineRef = useRef<Matter.Engine | null>(null);
   const renderRef = useRef<Matter.Render | null>(null);
   const runnerRef = useRef<Matter.Runner | null>(null);
-  const spinnerBodiesRef = useRef<Matter.Body[]>([]);
+  
   
   const [names, setNames] = useState<string[]>(DEFAULT_NAMES);
   const [scores, setScores] = useState<Record<string, number>>({});
@@ -37,7 +37,7 @@ export const PlinkoGame = () => {
   const [winner, setWinner] = useState<string | null>(null);
   const [activeBalls, setActiveBalls] = useState(0);
   const [isShaking, setIsShaking] = useState(false);
-  const [spinnersEnabled, setSpinnersEnabled] = useState(true);
+  
   const [luckySailor, setLuckySailor] = useState<string | null>(null);
   const [luckySailorEnabled, setLuckySailorEnabled] = useState(false);
   
@@ -85,7 +85,7 @@ export const PlinkoGame = () => {
   const createPegs = (world: Matter.World) => {
     const pegs: Matter.Body[] = [];
     const PEG_ROWS = 8;
-    const startY = 90;
+    const startY = 70;
     const rowSpacing = PEG_SPACING * 0.95;
     
     for (let row = 0; row < PEG_ROWS; row++) {
@@ -124,31 +124,6 @@ export const PlinkoGame = () => {
     }
     return positions;
   };
-
-  const createSpinners = (world: Matter.World) => {
-    if (!spinnersEnabled) return [];
-    
-    const spinners: Matter.Body[] = [];
-    const dropPositions = getDropPositions();
-    
-    dropPositions.forEach((x) => {
-      const spinner = Matter.Bodies.rectangle(x, 55, 35, 7, {
-        isStatic: true,
-        restitution: 0.8,
-        friction: 0.1,
-        render: {
-          fillStyle: '#8B4513',
-        },
-        label: 'spinner',
-      });
-      spinners.push(spinner);
-    });
-    
-    Matter.Composite.add(world, spinners);
-    spinnerBodiesRef.current = spinners;
-    return spinners;
-  };
-
   const createSlotWalls = (world: Matter.World) => {
     const walls: Matter.Body[] = [];
     const slotTop = BOARD_HEIGHT - 80;
@@ -200,12 +175,6 @@ export const PlinkoGame = () => {
           sounds.playBounce();
           const ball = pair.bodyA.label === 'ball' ? pair.bodyA : pair.bodyB;
           Matter.Body.setAngularVelocity(ball, (Math.random() - 0.5) * 0.3);
-        }
-        
-        if (labels.includes('ball') && labels.includes('spinner')) {
-          sounds.playBounce();
-          const ball = pair.bodyA.label === 'ball' ? pair.bodyA : pair.bodyB;
-          Matter.Body.setAngularVelocity(ball, (Math.random() - 0.5) * 0.5);
         }
         
         if (labels.includes('ball') && labels.includes('bottom')) {
@@ -314,18 +283,6 @@ export const PlinkoGame = () => {
     setIsDropping(false);
   };
 
-  useEffect(() => {
-    if (!spinnersEnabled) return;
-    
-    const interval = setInterval(() => {
-      spinnerBodiesRef.current.forEach((spinner, index) => {
-        const angle = spinner.angle + 0.05 * (index % 2 === 0 ? 1 : -1);
-        Matter.Body.setAngle(spinner, angle);
-      });
-    }, 16);
-    
-    return () => clearInterval(interval);
-  }, [spinnersEnabled]);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -348,7 +305,6 @@ export const PlinkoGame = () => {
     const runner = Matter.Runner.create();
 
     createPegs(engine.world);
-    createSpinners(engine.world);
     createSlotWalls(engine.world);
     setupCollisionDetection(engine);
 
@@ -364,7 +320,7 @@ export const PlinkoGame = () => {
       Matter.Runner.stop(runner);
       Matter.Engine.clear(engine);
     };
-  }, [names, spinnersEnabled, luckySailor, luckySailorEnabled]);
+  }, [names, luckySailor, luckySailorEnabled]);
 
   const dropBall = (x: number) => {
     if (!engineRef.current) return;
@@ -540,17 +496,6 @@ export const PlinkoGame = () => {
           <h3 className="font-pirate text-xl text-wood-dark mb-3">⚙️ Game Options</h3>
           
           <div className="flex flex-col gap-3">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={spinnersEnabled}
-                onChange={(e) => setSpinnersEnabled(e.target.checked)}
-                disabled={isDropping}
-                className="w-4 h-4"
-              />
-              <span className="text-wood-dark font-semibold">🌀 Enable Spinners</span>
-            </label>
-            
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
