@@ -84,12 +84,11 @@ export const PlinkoGame = () => {
 
   const createPegs = (world: Matter.World) => {
     const pegs: Matter.Body[] = [];
-    const rows = 8;
+    const PEG_ROWS = 8;
     const startY = 90;
-    const rowSpacing = PEG_SPACING * 0.866; // Hexagonal vertical spacing (sqrt(3)/2)
+    const rowSpacing = PEG_SPACING * 0.95;
     
-    for (let row = 0; row < rows; row++) {
-      // Alternate between full columns and offset columns
+    for (let row = 0; row < PEG_ROWS; row++) {
       const isOffsetRow = row % 2 === 1;
       const cols = isOffsetRow ? PEG_COLS - 1 : PEG_COLS;
       const rowOffset = isOffsetRow ? PEG_SPACING / 2 : 0;
