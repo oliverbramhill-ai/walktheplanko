@@ -4,9 +4,19 @@ interface DropZonesProps {
   dropCounts: number[];
   setDropCounts: (counts: number[]) => void;
   disabled: boolean;
+  names: string[];
+  dropPositions: number[];
+  boardWidth: number;
 }
 
-export const DropZones = ({ dropCounts, setDropCounts, disabled }: DropZonesProps) => {
+export const DropZones = ({ 
+  dropCounts, 
+  setDropCounts, 
+  disabled, 
+  names,
+  dropPositions,
+  boardWidth 
+}: DropZonesProps) => {
   const updateCount = (index: number, delta: number) => {
     const newCounts = [...dropCounts];
     newCounts[index] = Math.max(0, Math.min(10, newCounts[index] + delta));
@@ -20,34 +30,50 @@ export const DropZones = ({ dropCounts, setDropCounts, disabled }: DropZonesProp
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="flex gap-2 items-center">
-        {dropCounts.map((count, index) => (
-          <div 
-            key={index}
-            className="flex flex-col items-center gap-1 parchment-bg rounded-lg p-2 rope-border"
-          >
-            <span className="text-xs font-pirate text-wood-dark">Zone {index + 1}</span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => updateCount(index, -1)}
-                disabled={disabled || count <= 0}
-                className="w-6 h-6 rounded bg-wood-dark text-parchment flex items-center justify-center disabled:opacity-50 hover:bg-wood-mid transition-colors"
+      <div className="relative" style={{ width: boardWidth }}>
+        <div className="flex justify-between px-1">
+          {names.map((name, index) => {
+            const position = dropPositions[index];
+            const widthPercent = 100 / names.length;
+            
+            return (
+              <div 
+                key={index}
+                className="flex flex-col items-center gap-1 parchment-bg rounded-lg p-1.5 rope-border"
+                style={{ 
+                  width: `${widthPercent - 1}%`,
+                  minWidth: '60px'
+                }}
               >
-                <Minus className="w-4 h-4" />
-              </button>
-              <span className="w-8 text-center font-bold text-wood-dark text-lg">
-                {count}
-              </span>
-              <button
-                onClick={() => updateCount(index, 1)}
-                disabled={disabled || count >= 10}
-                className="w-6 h-6 rounded bg-wood-dark text-parchment flex items-center justify-center disabled:opacity-50 hover:bg-wood-mid transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        ))}
+                <span 
+                  className="text-xs font-pirate text-wood-dark truncate w-full text-center"
+                  title={name}
+                >
+                  {name}
+                </span>
+                <div className="flex items-center gap-0.5">
+                  <button
+                    onClick={() => updateCount(index, -1)}
+                    disabled={disabled || dropCounts[index] <= 0}
+                    className="w-5 h-5 rounded bg-wood-dark text-parchment flex items-center justify-center disabled:opacity-50 hover:bg-wood-mid transition-colors"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </button>
+                  <span className="w-6 text-center font-bold text-wood-dark text-sm">
+                    {dropCounts[index]}
+                  </span>
+                  <button
+                    onClick={() => updateCount(index, 1)}
+                    disabled={disabled || dropCounts[index] >= 10}
+                    className="w-5 h-5 rounded bg-wood-dark text-parchment flex items-center justify-center disabled:opacity-50 hover:bg-wood-mid transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
       <button
         onClick={randomize}
