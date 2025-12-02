@@ -329,7 +329,26 @@ export const PlinkoGame = () => {
     renderRef.current = render;
     runnerRef.current = runner;
 
+    // Bump detection: nudge stationary balls
+    const bumpInterval = setInterval(() => {
+      const bodies = Matter.Composite.allBodies(engine.world);
+      bodies.forEach(body => {
+        if (body.label === 'ball' && !(body as any).hasLanded) {
+          const speed = Math.sqrt(body.velocity.x ** 2 + body.velocity.y ** 2);
+          // If ball is nearly stationary (speed < 0.3) and within the play area
+          if (speed < 0.3 && body.position.y > 50 && body.position.y < BOARD_HEIGHT - 100) {
+            // Apply a random nudge
+            const nudgeX = (Math.random() - 0.5) * 3;
+            const nudgeY = Math.random() * 2 + 1;
+            Matter.Body.setVelocity(body, { x: nudgeX, y: nudgeY });
+            Matter.Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.3);
+          }
+        }
+      });
+    }, 500);
+
     return () => {
+      clearInterval(bumpInterval);
       Matter.Render.stop(render);
       Matter.Runner.stop(runner);
       Matter.Engine.clear(engine);
