@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import Matter from 'matter-js';
 import confetti from 'canvas-confetti';
 import { usePlinkoSounds } from '@/hooks/usePlinkoSounds';
@@ -14,7 +14,7 @@ const DEFAULT_NAMES = [
 const BOARD_WIDTH = 700;
 const BOARD_HEIGHT = 600;
 const PEG_RADIUS = 6;
-const BALL_RADIUS = 10;
+const BALL_RADIUS = 7; // Reduced by 30% from 10
 
 // Grid configuration - reduced margin for edge coverage
 const GRID_MARGIN = BOARD_WIDTH * 0.02; // 2% margin on each side
@@ -43,7 +43,7 @@ export const PlinkoGame = () => {
   
   const [names, setNames] = useState<string[]>(DEFAULT_NAMES);
   const [scores, setScores] = useState<Record<string, number>>({});
-  const [dropCounts, setDropCounts] = useState<number[]>(() => DEFAULT_NAMES.map(() => 2));
+  const dropCounts = useMemo(() => names.map(() => 15), [names]); // Fixed at 15 per zone
   const [isDropping, setIsDropping] = useState(false);
   const [winner, setWinner] = useState<string | null>(null);
   const [activeBalls, setActiveBalls] = useState(0);
@@ -109,7 +109,7 @@ export const PlinkoGame = () => {
         
         const peg = Matter.Bodies.circle(x, y, PEG_RADIUS, {
           isStatic: true,
-          restitution: 0.7,
+          restitution: 0.8,
           friction: 0.05,
           render: {
             fillStyle: '#C4A45F',
@@ -132,10 +132,13 @@ export const PlinkoGame = () => {
     const edgeOffset = 12; // Distance from wall
     
     for (let row = 0; row < PEG_ROWS; row++) {
+      // Only add edge pegs for odd rows
+      if (row % 2 !== 1) continue;
+      
       // Left edge peg
       const leftPeg = Matter.Bodies.circle(edgeOffset, startY + row * rowSpacing, PEG_RADIUS, {
         isStatic: true,
-        restitution: 0.7,
+        restitution: 0.8,
         friction: 0.05,
         render: {
           fillStyle: '#C4A45F',
@@ -147,7 +150,7 @@ export const PlinkoGame = () => {
       // Right edge peg
       const rightPeg = Matter.Bodies.circle(BOARD_WIDTH - edgeOffset, startY + row * rowSpacing, PEG_RADIUS, {
         isStatic: true,
-        restitution: 0.7,
+        restitution: 0.8,
         friction: 0.05,
         render: {
           fillStyle: '#C4A45F',
@@ -333,6 +336,13 @@ export const PlinkoGame = () => {
       gravity: { x: 0, y: 0.8 },
     });
     
+    // Increase ball-to-ball restitution for more bounce
+    engine.world.bodies.forEach(body => {
+      if (body.label === 'ball') {
+        body.restitution = 0.85;
+      }
+    });
+    
     const render = Matter.Render.create({
       canvas: canvasRef.current,
       engine: engine,
@@ -372,7 +382,7 @@ export const PlinkoGame = () => {
     const randomVelocityX = (Math.random() - 0.5) * 2;
     
     const ball = Matter.Bodies.circle(x + randomOffsetX, -10, BALL_RADIUS, {
-      restitution: 0.6,
+      restitution: 0.85,
       friction: 0.05,
       frictionAir: 0.015,
       render: {
@@ -463,15 +473,12 @@ export const PlinkoGame = () => {
     if (names.length >= 10) return;
     const newNames = [...names, `Crew ${names.length + 1}`];
     setNames(newNames);
-    setDropCounts([...dropCounts, 2]);
   };
 
   const removeName = (index: number) => {
     if (names.length <= 4) return;
     const newNames = names.filter((_, i) => i !== index);
-    const newDropCounts = dropCounts.filter((_, i) => i !== index);
     setNames(newNames);
-    setDropCounts(newDropCounts);
     if (luckySailor === names[index]) {
       setLuckySailor(null);
     }
@@ -485,9 +492,7 @@ export const PlinkoGame = () => {
         </h1>
         
         <DropZones 
-          dropCounts={dropCounts} 
-          setDropCounts={setDropCounts} 
-          disabled={isDropping}
+          dropCounts={dropCounts}
           names={names}
           dropPositions={getDropPositions()}
           boardWidth={BOARD_WIDTH}
