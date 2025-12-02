@@ -124,45 +124,6 @@ export const PlinkoGame = () => {
     return pegs;
   };
 
-  // Add edge guard pegs along both walls to prevent wall-hugging
-  const addEdgePegs = (world: Matter.World) => {
-    const edgePegs: Matter.Body[] = [];
-    const startY = 60;
-    const rowSpacing = (BOARD_HEIGHT - 150) / PEG_ROWS;
-    const edgeOffset = 12; // Distance from wall
-    
-    for (let row = 0; row < PEG_ROWS; row++) {
-      // Only add edge pegs for odd rows
-      if (row % 2 !== 1) continue;
-      
-      // Left edge peg
-      const leftPeg = Matter.Bodies.circle(edgeOffset, startY + row * rowSpacing, PEG_RADIUS, {
-        isStatic: true,
-        restitution: 0.8,
-        friction: 0.05,
-        render: {
-          fillStyle: '#C4A45F',
-        },
-        label: 'peg',
-      });
-      edgePegs.push(leftPeg);
-      
-      // Right edge peg
-      const rightPeg = Matter.Bodies.circle(BOARD_WIDTH - edgeOffset, startY + row * rowSpacing, PEG_RADIUS, {
-        isStatic: true,
-        restitution: 0.8,
-        friction: 0.05,
-        render: {
-          fillStyle: '#C4A45F',
-        },
-        label: 'peg',
-      });
-      edgePegs.push(rightPeg);
-    }
-    
-    Matter.Composite.add(world, edgePegs);
-    return edgePegs;
-  };
 
   // Calculate drop zone positions aligned to slot centers
   const getDropPositions = useCallback(() => {
@@ -174,16 +135,61 @@ export const PlinkoGame = () => {
     const slotTop = BOARD_HEIGHT - 80;
     const slotWidths = getSlotWidths();
     
-    walls.push(
-      Matter.Bodies.rectangle(-10, BOARD_HEIGHT / 2, 20, BOARD_HEIGHT, {
-        isStatic: true,
-        render: { fillStyle: '#5a3921' },
-      }),
-      Matter.Bodies.rectangle(BOARD_WIDTH + 10, BOARD_HEIGHT / 2, 20, BOARD_HEIGHT, {
-        isStatic: true,
-        render: { fillStyle: '#5a3921' },
-      })
-    );
+    // Create zig-zag side walls that mirror the peg grid
+    const startY = 60;
+    const rowSpacing = (BOARD_HEIGHT - 150) / PEG_ROWS;
+    const interiorGap = PEG_SPACING - 2 * PEG_RADIUS;
+    
+    // Calculate wall positions based on peg positions
+    const leftmostPegX = GRID_MARGIN;
+    const rightmostPegX = BOARD_WIDTH - GRID_MARGIN;
+    
+    // Wall zigzag offset - matches the peg pattern
+    const wallInset = PEG_SPACING / 2; // Amount to zig in/out
+    
+    const pointsLeft: Matter.Vector[] = [];
+    const pointsRight: Matter.Vector[] = [];
+    
+    // Build zig-zag points from top to slot area
+    for (let row = 0; row <= PEG_ROWS; row++) {
+      const y = startY + row * rowSpacing;
+      const isOffsetRow = row % 2 === 1;
+      
+      // Left wall: zig out on even rows, zag in on odd rows
+      const leftX = isOffsetRow 
+        ? leftmostPegX - interiorGap - PEG_RADIUS - wallInset
+        : leftmostPegX - interiorGap - PEG_RADIUS;
+      pointsLeft.push({ x: leftX, y });
+      
+      // Right wall: mirror of left
+      const rightX = isOffsetRow
+        ? rightmostPegX + interiorGap + PEG_RADIUS + wallInset
+        : rightmostPegX + interiorGap + PEG_RADIUS;
+      pointsRight.push({ x: rightX, y });
+    }
+    
+    // Close the polygons by adding bottom points
+    const bottomY = slotTop;
+    pointsLeft.push({ x: pointsLeft[pointsLeft.length - 1].x, y: bottomY });
+    pointsLeft.push({ x: -20, y: bottomY });
+    pointsLeft.push({ x: -20, y: startY });
+    
+    pointsRight.push({ x: pointsRight[pointsRight.length - 1].x, y: bottomY });
+    pointsRight.push({ x: BOARD_WIDTH + 20, y: bottomY });
+    pointsRight.push({ x: BOARD_WIDTH + 20, y: startY });
+    
+    // Create polygon walls
+    const leftWall = Matter.Bodies.fromVertices(0, 0, [pointsLeft], {
+      isStatic: true,
+      render: { fillStyle: '#5a3921' },
+    }, true);
+    
+    const rightWall = Matter.Bodies.fromVertices(0, 0, [pointsRight], {
+      isStatic: true,
+      render: { fillStyle: '#5a3921' },
+    }, true);
+    
+    walls.push(leftWall, rightWall);
     
     let currentX = 0;
     for (let i = 0; i <= names.length; i++) {
@@ -357,7 +363,6 @@ export const PlinkoGame = () => {
     const runner = Matter.Runner.create();
 
     createPegs(engine.world);
-    addEdgePegs(engine.world);
     createSlotWalls(engine.world);
     setupCollisionDetection(engine);
 
