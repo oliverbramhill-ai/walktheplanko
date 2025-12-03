@@ -95,7 +95,7 @@ export const PlinkoGame = () => {
 
   const createPegs = (world: Matter.World) => {
     const pegs: Matter.Body[] = [];
-    const startY = 60;
+    const startY = 90; // Moved down to give balls room to escape at top
     const rowSpacing = (BOARD_HEIGHT - 150) / PEG_ROWS;
     
     for (let row = 0; row < PEG_ROWS; row++) {
