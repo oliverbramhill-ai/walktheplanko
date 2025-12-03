@@ -337,9 +337,9 @@ export const PlinkoGame = () => {
           const speed = Math.sqrt(body.velocity.x ** 2 + body.velocity.y ** 2);
           // If ball is nearly stationary (speed < 0.3) and within the play area
           if (speed < 0.3 && body.position.y > 50 && body.position.y < BOARD_HEIGHT - 100) {
-            // Apply a random nudge
-            const nudgeX = (Math.random() - 0.5) * 3;
-            const nudgeY = Math.random() * 2 + 1;
+            // Apply a random nudge (doubled force)
+            const nudgeX = (Math.random() - 0.5) * 6;
+            const nudgeY = Math.random() * 4 + 2;
             Matter.Body.setVelocity(body, { x: nudgeX, y: nudgeY });
             Matter.Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.3);
           }
