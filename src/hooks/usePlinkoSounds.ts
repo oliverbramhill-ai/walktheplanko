@@ -37,8 +37,8 @@ const createNoise = (audioContext: AudioContext, duration: number, volume: numbe
   const filter = audioContext.createBiquadFilter();
   
   source.buffer = buffer;
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(1000, audioContext.currentTime);
+  filter.type = 'highpass';
+  filter.frequency.setValueAtTime(2000, audioContext.currentTime);
   
   source.connect(filter);
   filter.connect(gainNode);
@@ -48,6 +48,24 @@ const createNoise = (audioContext: AudioContext, duration: number, volume: numbe
   gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
   
   source.start(audioContext.currentTime);
+};
+
+const createLaserSound = (audioContext: AudioContext, startFreq: number, endFreq: number, duration: number, volume: number = 0.1) => {
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+  
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+  
+  oscillator.type = 'sawtooth';
+  oscillator.frequency.setValueAtTime(startFreq, audioContext.currentTime);
+  oscillator.frequency.exponentialRampToValueAtTime(endFreq, audioContext.currentTime + duration);
+  
+  gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+  
+  oscillator.start(audioContext.currentTime);
+  oscillator.stop(audioContext.currentTime + duration);
 };
 
 export const usePlinkoSounds = () => {
@@ -60,43 +78,72 @@ export const usePlinkoSounds = () => {
     return audioContextRef.current;
   }, []);
 
+  // Laser zap bounce sound
   const playBounce = useCallback(() => {
     const ctx = getAudioContext();
-    const freq = 200 + Math.random() * 300;
-    createOscillator(ctx, freq, 0.05, 'triangle', 0.08);
-    createNoise(ctx, 0.02, 0.03);
+    const startFreq = 800 + Math.random() * 400;
+    createLaserSound(ctx, startFreq, startFreq * 0.3, 0.06, 0.08);
   }, [getAudioContext]);
 
+  // Meteor launch sound
   const playDrop = useCallback(() => {
     const ctx = getAudioContext();
-    createOscillator(ctx, 150, 0.15, 'sine', 0.15);
-    createNoise(ctx, 0.1, 0.08);
+    createLaserSound(ctx, 200, 800, 0.2, 0.12);
+    createNoise(ctx, 0.15, 0.06);
   }, [getAudioContext]);
 
+  // Energy field landing
   const playSlotLand = useCallback(() => {
     const ctx = getAudioContext();
-    createOscillator(ctx, 400, 0.1, 'sine', 0.12);
-    setTimeout(() => createOscillator(ctx, 500, 0.1, 'sine', 0.1), 50);
-    setTimeout(() => createOscillator(ctx, 600, 0.15, 'sine', 0.08), 100);
+    createOscillator(ctx, 600, 0.08, 'sine', 0.1);
+    setTimeout(() => createOscillator(ctx, 800, 0.08, 'sine', 0.08), 40);
+    setTimeout(() => createOscillator(ctx, 1000, 0.1, 'sine', 0.06), 80);
+    setTimeout(() => createOscillator(ctx, 1200, 0.15, 'triangle', 0.05), 120);
   }, [getAudioContext]);
 
+  // Victory fanfare - space epic style
   const playWinner = useCallback(() => {
     const ctx = getAudioContext();
-    const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6
+    const notes = [523, 659, 784, 1047, 1319]; // C5, E5, G5, C6, E6
     notes.forEach((freq, i) => {
       setTimeout(() => {
-        createOscillator(ctx, freq, 0.3, 'sine', 0.15);
-        createOscillator(ctx, freq * 1.5, 0.2, 'triangle', 0.08);
-      }, i * 150);
+        createOscillator(ctx, freq, 0.4, 'sine', 0.12);
+        createOscillator(ctx, freq * 1.5, 0.3, 'triangle', 0.06);
+        createOscillator(ctx, freq * 2, 0.2, 'sine', 0.04);
+      }, i * 120);
     });
   }, [getAudioContext]);
 
-  const playArrr = useCallback(() => {
+  // Alien transmission sound (replaces Arrr)
+  const playAlienTransmission = useCallback(() => {
     const ctx = getAudioContext();
-    // Low growly "arrr" sound
-    createOscillator(ctx, 100, 0.4, 'sawtooth', 0.1);
-    createOscillator(ctx, 150, 0.3, 'triangle', 0.08);
-    createNoise(ctx, 0.3, 0.05);
+    // Warbling alien sound
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    
+    osc1.connect(gainNode);
+    osc2.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    
+    osc1.type = 'sine';
+    osc2.type = 'sine';
+    
+    osc1.frequency.setValueAtTime(400, ctx.currentTime);
+    osc1.frequency.linearRampToValueAtTime(600, ctx.currentTime + 0.2);
+    osc1.frequency.linearRampToValueAtTime(400, ctx.currentTime + 0.4);
+    
+    osc2.frequency.setValueAtTime(800, ctx.currentTime);
+    osc2.frequency.linearRampToValueAtTime(1200, ctx.currentTime + 0.2);
+    osc2.frequency.linearRampToValueAtTime(800, ctx.currentTime + 0.4);
+    
+    gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+    
+    osc1.start(ctx.currentTime);
+    osc2.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.5);
+    osc2.stop(ctx.currentTime + 0.5);
   }, [getAudioContext]);
 
   return {
@@ -104,6 +151,6 @@ export const usePlinkoSounds = () => {
     playDrop,
     playSlotLand,
     playWinner,
-    playArrr,
+    playArrr: playAlienTransmission, // Keep same API name for compatibility
   };
 };

@@ -8,18 +8,18 @@ import { WinnerBanner } from './WinnerBanner';
 import { NameSlots } from './NameSlots';
 
 const DEFAULT_NAMES = [
-  'Oliver', 'David', 'Alina', 'Camille', 'James', 'Adri', 'Ross', 'Luke', 'Romain'
+  'Nova', 'Orion', 'Luna', 'Vega', 'Cosmo', 'Stella', 'Nebula', 'Quasar', 'Astro'
 ];
 
 const BOARD_WIDTH = 700;
 const BOARD_HEIGHT = 600;
 const PEG_RADIUS = 6;
-const BALL_RADIUS = 7; // Reduced by 30% from 10
+const BALL_RADIUS = 7;
 
-// Grid configuration - reduced margin for edge coverage
-const GRID_MARGIN = BOARD_WIDTH * 0.02; // 2% margin on each side
+// Grid configuration
+const GRID_MARGIN = BOARD_WIDTH * 0.02;
 const GRID_WIDTH = BOARD_WIDTH - (GRID_MARGIN * 2);
-const PEG_COLS = 13; // More columns for denser coverage
+const PEG_COLS = 13;
 const PEG_SPACING = GRID_WIDTH / (PEG_COLS - 1);
 const PEG_ROWS = 12;
 
@@ -43,14 +43,14 @@ export const PlinkoGame = () => {
   
   const [names, setNames] = useState<string[]>(DEFAULT_NAMES);
   const [scores, setScores] = useState<Record<string, number>>({});
-  const dropCounts = useMemo(() => names.map(() => 15), [names]); // Fixed at 15 per zone
+  const dropCounts = useMemo(() => names.map(() => 15), [names]);
   const [isDropping, setIsDropping] = useState(false);
   const [winner, setWinner] = useState<string | null>(null);
   const [activeBalls, setActiveBalls] = useState(0);
   const [isShaking, setIsShaking] = useState(false);
   
-  const [luckySailor, setLuckySailor] = useState<string | null>(null);
-  const [luckySailorEnabled, setLuckySailorEnabled] = useState(false);
+  const [acePilot, setAcePilot] = useState<string | null>(null);
+  const [acePilotEnabled, setAcePilotEnabled] = useState(false);
   
   const sounds = usePlinkoSounds();
   const ballCountRef = useRef(0);
@@ -59,25 +59,25 @@ export const PlinkoGame = () => {
   const scoresRef = useRef<Record<string, number>>({});
   const hasAnnouncedWinnerRef = useRef(false);
 
-  // Calculate slot widths with Lucky Sailor adjustment
+  // Calculate slot widths with Ace Pilot adjustment
   const getSlotWidths = useCallback(() => {
-    if (!luckySailorEnabled || !luckySailor) {
+    if (!acePilotEnabled || !acePilot) {
       return names.map(() => 100 / names.length);
     }
     
-    const luckyIndex = names.indexOf(luckySailor);
-    if (luckyIndex === -1) {
+    const pilotIndex = names.indexOf(acePilot);
+    if (pilotIndex === -1) {
       return names.map(() => 100 / names.length);
     }
     
     const normalWidth = 100 / names.length;
-    const luckyWidth = normalWidth / 2;
-    const extraWidth = (normalWidth - luckyWidth) / (names.length - 1);
+    const pilotWidth = normalWidth / 2;
+    const extraWidth = (normalWidth - pilotWidth) / (names.length - 1);
     
     return names.map((name) => 
-      name === luckySailor ? luckyWidth : normalWidth + extraWidth
+      name === acePilot ? pilotWidth : normalWidth + extraWidth
     );
-  }, [names, luckySailor, luckySailorEnabled]);
+  }, [names, acePilot, acePilotEnabled]);
 
   const initializeScores = useCallback(() => {
     const initialScores: Record<string, number> = {};
@@ -95,7 +95,7 @@ export const PlinkoGame = () => {
 
   const createPegs = (world: Matter.World) => {
     const pegs: Matter.Body[] = [];
-    const startY = 90; // Moved down to give balls room to escape at top
+    const startY = 90;
     const rowSpacing = (BOARD_HEIGHT - 150) / PEG_ROWS;
     
     for (let row = 0; row < PEG_ROWS; row++) {
@@ -112,7 +112,7 @@ export const PlinkoGame = () => {
           restitution: 0.8,
           friction: 0.05,
           render: {
-            fillStyle: '#C4A45F',
+            fillStyle: '#00ffff',
           },
           label: 'peg',
         });
@@ -139,11 +139,11 @@ export const PlinkoGame = () => {
     walls.push(
       Matter.Bodies.rectangle(-10, BOARD_HEIGHT / 2, 20, BOARD_HEIGHT, {
         isStatic: true,
-        render: { fillStyle: '#5a3921' },
+        render: { fillStyle: '#1a1a3e' },
       }),
       Matter.Bodies.rectangle(BOARD_WIDTH + 10, BOARD_HEIGHT / 2, 20, BOARD_HEIGHT, {
         isStatic: true,
-        render: { fillStyle: '#5a3921' },
+        render: { fillStyle: '#1a1a3e' },
       })
     );
     
@@ -152,7 +152,7 @@ export const PlinkoGame = () => {
       const x = i === 0 ? 0 : currentX;
       const wall = Matter.Bodies.rectangle(x, slotTop + 40, 6, 80, {
         isStatic: true,
-        render: { fillStyle: '#5a3921' },
+        render: { fillStyle: '#6366f1' },
       });
       walls.push(wall);
       
@@ -164,7 +164,7 @@ export const PlinkoGame = () => {
     walls.push(
       Matter.Bodies.rectangle(BOARD_WIDTH / 2, BOARD_HEIGHT + 10, BOARD_WIDTH, 20, {
         isStatic: true,
-        render: { fillStyle: '#5a3921' },
+        render: { fillStyle: '#1a1a3e' },
         label: 'bottom',
       })
     );
@@ -188,7 +188,6 @@ export const PlinkoGame = () => {
           const ball = pair.bodyA.label === 'ball' ? pair.bodyA : pair.bodyB;
           const landedBall = ball as any;
           
-          // Ignore repeated bottom hits from the same ball
           if (landedBall.hasLanded) {
             return;
           }
@@ -241,7 +240,6 @@ export const PlinkoGame = () => {
   };
 
   const checkWinner = () => {
-    // Don't announce twice
     if (hasAnnouncedWinnerRef.current) return;
     
     const currentScores = scoresRef.current;
@@ -270,14 +268,14 @@ export const PlinkoGame = () => {
           angle: 60,
           spread: 55,
           origin: { x: 0, y: 0.7 },
-          colors: ['#FFD700', '#DAA520', '#8B4513', '#CD853F', '#DEB887'],
+          colors: ['#00ffff', '#ff00ff', '#6366f1', '#8b5cf6', '#ec4899'],
         });
         confetti({
           particleCount: 5,
           angle: 120,
           spread: 55,
           origin: { x: 1, y: 0.7 },
-          colors: ['#FFD700', '#DAA520', '#8B4513', '#CD853F', '#DEB887'],
+          colors: ['#00ffff', '#ff00ff', '#6366f1', '#8b5cf6', '#ec4899'],
         });
         
         if (Date.now() < end) {
@@ -298,7 +296,6 @@ export const PlinkoGame = () => {
       gravity: { x: 0, y: 0.8 },
     });
     
-    // Increase ball-to-ball restitution for more bounce
     engine.world.bodies.forEach(body => {
       if (body.label === 'ball') {
         body.restitution = 0.85;
@@ -353,7 +350,7 @@ export const PlinkoGame = () => {
       Matter.Runner.stop(runner);
       Matter.Engine.clear(engine);
     };
-  }, [names, luckySailor, luckySailorEnabled]);
+  }, [names, acePilot, acePilotEnabled]);
 
   const dropBall = (x: number) => {
     if (!engineRef.current) return;
@@ -366,8 +363,8 @@ export const PlinkoGame = () => {
       friction: 0.05,
       frictionAir: 0.015,
       render: {
-        fillStyle: '#2a2a2a',
-        strokeStyle: '#4a4a4a',
+        fillStyle: '#ff6b35',
+        strokeStyle: '#ffaa00',
         lineWidth: 2,
       },
       label: 'ball',
@@ -451,7 +448,7 @@ export const PlinkoGame = () => {
 
   const addName = () => {
     if (names.length >= 10) return;
-    const newNames = [...names, `Crew ${names.length + 1}`];
+    const newNames = [...names, `Pilot ${names.length + 1}`];
     setNames(newNames);
   };
 
@@ -459,16 +456,16 @@ export const PlinkoGame = () => {
     if (names.length <= 4) return;
     const newNames = names.filter((_, i) => i !== index);
     setNames(newNames);
-    if (luckySailor === names[index]) {
-      setLuckySailor(null);
+    if (acePilot === names[index]) {
+      setAcePilot(null);
     }
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 items-start justify-center p-4">
+    <div className="flex flex-col lg:flex-row gap-6 items-start justify-center p-4 relative z-10">
       <div className="flex flex-col items-center gap-4">
-        <h1 className="text-4xl md:text-6xl font-pirate text-primary drop-shadow-lg">
-          Walk the Plank-o! ☠️
+        <h1 className="text-4xl md:text-6xl font-space text-cyan-glow drop-shadow-[0_0_30px_hsl(180,100%,50%)] tracking-wider">
+          A-PLONK US! 👽
         </h1>
         
         <DropZones 
@@ -479,47 +476,47 @@ export const PlinkoGame = () => {
         />
         
         <div className={`relative ${isShaking ? 'animate-shake' : ''}`}>
-          <div className="wood-texture rope-border rounded-xl p-2">
+          <div className="space-panel neon-border rounded-xl p-2">
             <canvas 
               ref={canvasRef} 
               className="rounded-lg"
               style={{ 
-                background: 'linear-gradient(180deg, #1a3a5c 0%, #0f2942 100%)',
+                background: 'radial-gradient(ellipse at center, #1a1a3e 0%, #0a0a1f 100%)',
               }}
             />
             <NameSlots 
               names={names} 
               scores={scores} 
               slotWidths={getSlotWidths()}
-              luckySailor={luckySailorEnabled ? luckySailor : null}
+              acePilot={acePilotEnabled ? acePilot : null}
             />
           </div>
           
-          <div className="absolute -top-4 -left-4 text-3xl animate-float">⚓</div>
-          <div className="absolute -top-4 -right-4 text-3xl animate-float" style={{ animationDelay: '1s' }}>🏴‍☠️</div>
-          <div className="absolute -bottom-4 -left-4 text-2xl animate-wave">🦜</div>
-          <div className="absolute -bottom-4 -right-4 text-2xl animate-wave" style={{ animationDelay: '0.5s' }}>💰</div>
+          <div className="absolute -top-4 -left-4 text-3xl animate-float">🛸</div>
+          <div className="absolute -top-4 -right-4 text-3xl animate-orbit" style={{ animationDelay: '1s' }}>🌟</div>
+          <div className="absolute -bottom-4 -left-4 text-2xl animate-twinkle">👾</div>
+          <div className="absolute -bottom-4 -right-4 text-2xl animate-float" style={{ animationDelay: '0.5s' }}>🪐</div>
         </div>
         
         <div className="flex gap-4 flex-wrap justify-center">
           <button 
             onClick={handleDrop}
             disabled={isDropping}
-            className="pirate-button text-xl disabled:opacity-50 disabled:cursor-not-allowed"
+            className="space-button text-xl disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            🎯 DROP THE CANNONBALLS!
+            🚀 LAUNCH METEORS!
           </button>
           <button 
             onClick={handleReset}
-            className="pirate-button-red text-xl"
+            className="space-button-pink text-xl"
           >
-            🔄 RESET BOARD
+            🔄 RESET GALAXY
           </button>
         </div>
         
         {activeBalls > 0 && (
-          <p className="text-lg font-pirate text-gold">
-            ⚫ Balls in play: {activeBalls}
+          <p className="text-lg font-space text-cyan-glow drop-shadow-[0_0_10px_hsl(180,100%,50%)]">
+            ☄️ Meteors in orbit: {activeBalls}
           </p>
         )}
       </div>
@@ -527,29 +524,29 @@ export const PlinkoGame = () => {
       <div className="flex flex-col gap-4">
         <Scoreboard names={names} scores={scores} />
         
-        <div className="parchment-bg rounded-xl p-4 rope-border">
-          <h3 className="font-pirate text-xl text-wood-dark mb-3">⚙️ Game Options</h3>
+        <div className="hologram-bg rounded-xl p-4 neon-border">
+          <h3 className="font-space text-xl text-cyan-glow mb-3">⚙️ Mission Settings</h3>
           
           <div className="flex flex-col gap-3">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
-                checked={luckySailorEnabled}
-                onChange={(e) => setLuckySailorEnabled(e.target.checked)}
+                checked={acePilotEnabled}
+                onChange={(e) => setAcePilotEnabled(e.target.checked)}
                 disabled={isDropping}
-                className="w-4 h-4"
+                className="w-4 h-4 accent-cyan-400"
               />
-              <span className="text-wood-dark font-semibold">🍀 Lucky Sailor Mode</span>
+              <span className="text-star-white font-semibold">🎯 Ace Pilot Mode</span>
             </label>
             
-            {luckySailorEnabled && (
+            {acePilotEnabled && (
               <select
-                value={luckySailor || ''}
-                onChange={(e) => setLuckySailor(e.target.value || null)}
+                value={acePilot || ''}
+                onChange={(e) => setAcePilot(e.target.value || null)}
                 disabled={isDropping}
-                className="px-2 py-1 rounded bg-wood-dark text-parchment text-sm border border-rope"
+                className="px-2 py-1 rounded bg-space-deep text-star-white text-sm border border-cyan-glow/50 focus:border-cyan-glow focus:outline-none"
               >
-                <option value="">Select Lucky Sailor...</option>
+                <option value="">Select Ace Pilot...</option>
                 {names.map((name) => (
                   <option key={name} value={name}>{name}</option>
                 ))}
@@ -558,9 +555,9 @@ export const PlinkoGame = () => {
           </div>
         </div>
         
-        <div className="parchment-bg rounded-xl p-4 rope-border">
+        <div className="hologram-bg rounded-xl p-4 neon-border">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="font-pirate text-xl text-wood-dark">Edit Crew Names</h3>
+            <h3 className="font-space text-xl text-cyan-glow">Edit Crew Names</h3>
             <div className="flex gap-2">
               <button
                 onClick={() => {
@@ -568,20 +565,20 @@ export const PlinkoGame = () => {
                   setNames(shuffled);
                 }}
                 disabled={isDropping}
-                className="text-sm px-3 py-1 rounded bg-wood-dark text-parchment font-pirate hover:bg-wood-mid transition-colors disabled:opacity-50"
+                className="text-sm px-3 py-1 rounded bg-space-deep text-star-white font-space hover:bg-nebula-purple/30 transition-colors disabled:opacity-50 border border-cyan-glow/30"
               >
                 🔀 Shuffle
               </button>
               <button
                 onClick={addName}
                 disabled={isDropping || names.length >= 10}
-                className="text-sm px-3 py-1 rounded bg-green-700 text-parchment font-pirate hover:bg-green-600 transition-colors disabled:opacity-50"
+                className="text-sm px-3 py-1 rounded bg-alien-green/20 text-alien-green font-space hover:bg-alien-green/30 transition-colors disabled:opacity-50 border border-alien-green/50"
               >
                 + Add
               </button>
             </div>
           </div>
-          <p className="text-xs text-wood-mid mb-2">({names.length}/10 crew members)</p>
+          <p className="text-xs text-cyan-light mb-2">({names.length}/10 crew members)</p>
           <div className="grid grid-cols-3 gap-2">
             {names.map((name, index) => (
               <div key={index} className="flex gap-1">
@@ -593,14 +590,14 @@ export const PlinkoGame = () => {
                     newNames[index] = e.target.value;
                     setNames(newNames);
                   }}
-                  className="flex-1 px-2 py-1 rounded bg-wood-dark text-parchment text-sm border border-rope focus:outline-none focus:ring-2 focus:ring-gold"
+                  className="flex-1 px-2 py-1 rounded bg-space-deep text-star-white text-sm border border-cyan-glow/30 focus:outline-none focus:ring-2 focus:ring-cyan-glow"
                   disabled={isDropping}
                 />
                 {names.length > 4 && (
                   <button
                     onClick={() => removeName(index)}
                     disabled={isDropping}
-                    className="px-2 py-1 rounded bg-red-700 text-parchment text-xs hover:bg-red-600 disabled:opacity-50"
+                    className="px-2 py-1 rounded bg-nebula-pink/20 text-nebula-pink text-xs hover:bg-nebula-pink/30 disabled:opacity-50 border border-nebula-pink/50"
                   >
                     ✕
                   </button>
