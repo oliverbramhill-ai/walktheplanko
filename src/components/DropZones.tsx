@@ -13,7 +13,7 @@ export const DropZones = ({
 }: DropZonesProps) => {
   return (
     <div className="flex flex-col items-center gap-2">
-      <p className="text-sm font-pirate text-wood-dark">⚫ 15 Cannonballs per zone</p>
+      <p className="text-sm font-space text-cyan-light">☄️ 15 Meteors per launch bay</p>
       <div className="relative" style={{ width: boardWidth }}>
         <div className="flex justify-between px-1">
           {names.map((name, index) => {
@@ -22,19 +22,19 @@ export const DropZones = ({
             return (
               <div 
                 key={index}
-                className="flex flex-col items-center gap-1 parchment-bg rounded-lg p-1.5 rope-border"
+                className="flex flex-col items-center gap-1 hologram-bg rounded-lg p-1.5 neon-border"
                 style={{ 
                   width: `${widthPercent - 1}%`,
                   minWidth: '60px'
                 }}
               >
                 <span 
-                  className="text-xs font-pirate text-wood-dark truncate w-full text-center"
+                  className="text-xs font-space text-cyan-glow truncate w-full text-center"
                   title={name}
                 >
                   {name}
                 </span>
-                <span className="text-center font-bold text-wood-dark text-sm">
+                <span className="text-center font-bold text-star-white text-sm">
                   {dropCounts[index]}
                 </span>
               </div>
