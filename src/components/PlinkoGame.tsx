@@ -293,7 +293,7 @@ export const PlinkoGame = () => {
     if (!canvasRef.current) return;
 
     const engine = Matter.Engine.create({
-      gravity: { x: 0, y: 0.8 },
+      gravity: { x: 0, y: 0.4 },
     });
     
     engine.world.bodies.forEach(body => {
