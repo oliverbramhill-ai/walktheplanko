@@ -399,29 +399,44 @@ export const PlinkoGame = () => {
     setTimeout(() => setIsShaking(false), 500);
     
     const dropPositions = getDropPositions();
+    const remainingDrops = [...dropCounts];
     
-    const maxWaves = Math.max(...dropCounts);
-    let waveIndex = 0;
+    // Build a sequence of drops: sweep left-to-right, then right-to-left
+    const dropSequence: number[] = [];
+    let goingRight = true;
     
-    const dropWave = () => {
-      if (waveIndex >= maxWaves) return;
+    while (remainingDrops.some(count => count > 0)) {
+      const indices = goingRight 
+        ? [...Array(dropPositions.length).keys()]
+        : [...Array(dropPositions.length).keys()].reverse();
       
-      dropPositions.forEach((pos, zoneIndex) => {
-        if (waveIndex < dropCounts[zoneIndex]) {
-          setTimeout(() => {
-            dropBall(pos);
-            sounds.playDrop();
-          }, Math.random() * 100);
+      for (const zoneIndex of indices) {
+        if (remainingDrops[zoneIndex] > 0) {
+          dropSequence.push(zoneIndex);
+          remainingDrops[zoneIndex]--;
         }
-      });
+      }
+      goingRight = !goingRight;
+    }
+    
+    // Drop balls one at a time with steady delay
+    let dropIndex = 0;
+    const dropInterval = 300; // ms between each ball
+    
+    const dropNext = () => {
+      if (dropIndex >= dropSequence.length) return;
       
-      waveIndex++;
-      if (waveIndex < maxWaves) {
-        setTimeout(dropWave, 400);
+      const zoneIndex = dropSequence[dropIndex];
+      dropBall(dropPositions[zoneIndex]);
+      sounds.playDrop();
+      
+      dropIndex++;
+      if (dropIndex < dropSequence.length) {
+        setTimeout(dropNext, dropInterval);
       }
     };
     
-    dropWave();
+    dropNext();
   };
 
   const handleReset = () => {
