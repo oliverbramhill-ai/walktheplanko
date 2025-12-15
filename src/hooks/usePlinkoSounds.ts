@@ -78,18 +78,18 @@ export const usePlinkoSounds = () => {
     return audioContextRef.current;
   }, []);
 
-  // Laser zap bounce sound
+  // Soft chime bounce sound
   const playBounce = useCallback(() => {
     const ctx = getAudioContext();
-    const startFreq = 800 + Math.random() * 400;
-    createLaserSound(ctx, startFreq, startFreq * 0.3, 0.06, 0.08);
+    const freq = 600 + Math.random() * 300;
+    createOscillator(ctx, freq, 0.08, 'sine', 0.03);
   }, [getAudioContext]);
 
-  // Meteor launch sound
+  // Gentle whoosh drop sound
   const playDrop = useCallback(() => {
     const ctx = getAudioContext();
-    createLaserSound(ctx, 200, 800, 0.2, 0.12);
-    createNoise(ctx, 0.15, 0.06);
+    createOscillator(ctx, 300, 0.15, 'sine', 0.04);
+    createOscillator(ctx, 450, 0.1, 'triangle', 0.02);
   }, [getAudioContext]);
 
   // Energy field landing
