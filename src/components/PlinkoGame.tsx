@@ -421,7 +421,7 @@ export const PlinkoGame = () => {
     
     // Drop balls one at a time with steady delay
     let dropIndex = 0;
-    const dropInterval = 300; // ms between each ball
+    const dropInterval = 100; // ms between each ball
     
     const dropNext = () => {
       if (dropIndex >= dropSequence.length) return;
