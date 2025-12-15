@@ -39,6 +39,9 @@ export const PlinkoGame = () => {
   const engineRef = useRef<Matter.Engine | null>(null);
   const renderRef = useRef<Matter.Render | null>(null);
   const runnerRef = useRef<Matter.Runner | null>(null);
+  const slotWallsRef = useRef<Matter.Body[]>([]);
+  const scrollOffsetRef = useRef(0);
+  const scrollAnimationRef = useRef<number | null>(null);
   
   
   const [names, setNames] = useState<string[]>(DEFAULT_NAMES);
@@ -48,6 +51,7 @@ export const PlinkoGame = () => {
   const [winner, setWinner] = useState<string | null>(null);
   const [activeBalls, setActiveBalls] = useState(0);
   const [isShaking, setIsShaking] = useState(false);
+  const [scrollOffset, setScrollOffset] = useState(0);
   
   const [acePilot, setAcePilot] = useState<string | null>(null);
   const [acePilotEnabled, setAcePilotEnabled] = useState(false);
@@ -132,6 +136,7 @@ export const PlinkoGame = () => {
   }, [getSlotWidths]);
   const createSlotWalls = (world: Matter.World) => {
     const walls: Matter.Body[] = [];
+    const dividerWalls: Matter.Body[] = [];
     const slotTop = BOARD_HEIGHT - 80;
     const slotWidths = getSlotWidths();
     
@@ -147,14 +152,16 @@ export const PlinkoGame = () => {
       })
     );
     
+    // Create slot divider walls - we'll animate these
     let currentX = 0;
     for (let i = 0; i <= names.length; i++) {
       const x = i === 0 ? 0 : currentX;
       const wall = Matter.Bodies.rectangle(x, slotTop + 40, 6, 80, {
         isStatic: true,
         render: { fillStyle: '#6366f1' },
+        label: 'slotWall',
       });
-      walls.push(wall);
+      dividerWalls.push(wall);
       
       if (i < names.length) {
         currentX += (slotWidths[i] / 100) * BOARD_WIDTH;
@@ -169,9 +176,38 @@ export const PlinkoGame = () => {
       })
     );
     
-    Matter.Composite.add(world, walls);
+    Matter.Composite.add(world, [...walls, ...dividerWalls]);
+    slotWallsRef.current = dividerWalls;
     return walls;
   };
+
+  // Update slot wall positions based on scroll offset
+  const updateSlotWallPositions = useCallback((offset: number) => {
+    if (!slotWallsRef.current.length) return;
+    
+    const slotWidths = getSlotWidths();
+    const totalWidth = BOARD_WIDTH;
+    
+    // Normalize offset to be within 0 to totalWidth
+    const normalizedOffset = ((offset % totalWidth) + totalWidth) % totalWidth;
+    
+    let baseX = 0;
+    slotWallsRef.current.forEach((wall, i) => {
+      if (i === 0) {
+        // First wall position
+        let newX = -normalizedOffset;
+        if (newX < -totalWidth / 2) newX += totalWidth;
+        Matter.Body.setPosition(wall, { x: newX, y: wall.position.y });
+      } else {
+        baseX += (slotWidths[i - 1] / 100) * totalWidth;
+        let newX = baseX - normalizedOffset;
+        // Wrap around
+        if (newX < -totalWidth / 2) newX += totalWidth;
+        if (newX > totalWidth + totalWidth / 2) newX -= totalWidth;
+        Matter.Body.setPosition(wall, { x: newX, y: wall.position.y });
+      }
+    });
+  }, [getSlotWidths]);
 
   const setupCollisionDetection = (engine: Matter.Engine) => {
     Matter.Events.on(engine, 'collisionStart', (event) => {
@@ -194,12 +230,22 @@ export const PlinkoGame = () => {
           landedBall.hasLanded = true;
           
           const slotWidths = getSlotWidths();
+          const totalWidth = BOARD_WIDTH;
+          
+          // Account for scroll offset when determining slot
+          const currentOffset = scrollOffsetRef.current;
+          const normalizedOffset = ((currentOffset % totalWidth) + totalWidth) % totalWidth;
+          
+          // Adjust ball position by adding back the offset to find "virtual" position
+          let virtualX = ball.position.x + normalizedOffset;
+          if (virtualX >= totalWidth) virtualX -= totalWidth;
+          
           let accumulatedWidth = 0;
           let slotIndex = 0;
           
           for (let i = 0; i < names.length; i++) {
             const slotPixelWidth = (slotWidths[i] / 100) * BOARD_WIDTH;
-            if (ball.position.x < accumulatedWidth + slotPixelWidth) {
+            if (virtualX < accumulatedWidth + slotPixelWidth) {
               slotIndex = i;
               break;
             }
@@ -287,6 +333,44 @@ export const PlinkoGame = () => {
     
     setIsDropping(false);
   };
+
+  // Start/stop scroll animation based on isDropping
+  useEffect(() => {
+    if (isDropping) {
+      const scrollSpeed = 1.5; // pixels per frame
+      let lastTime = performance.now();
+      
+      const animate = (currentTime: number) => {
+        const delta = currentTime - lastTime;
+        lastTime = currentTime;
+        
+        scrollOffsetRef.current += scrollSpeed * (delta / 16.67); // Normalize to ~60fps
+        const normalizedOffset = scrollOffsetRef.current % BOARD_WIDTH;
+        
+        setScrollOffset(normalizedOffset);
+        updateSlotWallPositions(scrollOffsetRef.current);
+        
+        scrollAnimationRef.current = requestAnimationFrame(animate);
+      };
+      
+      scrollAnimationRef.current = requestAnimationFrame(animate);
+    } else {
+      if (scrollAnimationRef.current) {
+        cancelAnimationFrame(scrollAnimationRef.current);
+        scrollAnimationRef.current = null;
+      }
+      // Reset scroll position when not dropping
+      scrollOffsetRef.current = 0;
+      setScrollOffset(0);
+      updateSlotWallPositions(0);
+    }
+    
+    return () => {
+      if (scrollAnimationRef.current) {
+        cancelAnimationFrame(scrollAnimationRef.current);
+      }
+    };
+  }, [isDropping, updateSlotWallPositions]);
 
 
   useEffect(() => {
@@ -504,6 +588,8 @@ export const PlinkoGame = () => {
               scores={scores} 
               slotWidths={getSlotWidths()}
               acePilot={acePilotEnabled ? acePilot : null}
+              scrollOffset={scrollOffset}
+              boardWidth={BOARD_WIDTH}
             />
           </div>
           
