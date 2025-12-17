@@ -14,8 +14,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        space: ["Orbitron", "sans-serif"],
-        sans: ["Exo 2", "sans-serif"],
+        pirate: ["Pirata One", "cursive"],
+        sans: ["Inter", "sans-serif"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -51,34 +51,26 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        space: {
-          void: "hsl(var(--space-void))",
-          deep: "hsl(var(--space-deep))",
-          nebula: "hsl(var(--space-nebula))",
+        ocean: {
+          deep: "hsl(var(--ocean-deep))",
+          mid: "hsl(var(--ocean-mid))",
+          light: "hsl(var(--ocean-light))",
         },
-        nebula: {
-          pink: "hsl(var(--nebula-pink))",
-          purple: "hsl(var(--nebula-purple))",
-          blue: "hsl(var(--nebula-blue))",
+        wood: {
+          dark: "hsl(var(--wood-dark))",
+          mid: "hsl(var(--wood-mid))",
+          light: "hsl(var(--wood-light))",
         },
-        star: {
-          white: "hsl(var(--star-white))",
-          blue: "hsl(var(--star-blue))",
+        gold: {
+          DEFAULT: "hsl(var(--gold))",
+          light: "hsl(var(--gold-light))",
         },
-        cyan: {
-          glow: "hsl(var(--cyan-glow))",
-          light: "hsl(var(--cyan-light))",
+        parchment: {
+          DEFAULT: "hsl(var(--parchment))",
+          dark: "hsl(var(--parchment-dark))",
         },
-        meteor: {
-          orange: "hsl(var(--meteor-orange))",
-          red: "hsl(var(--meteor-red))",
-        },
-        alien: {
-          green: "hsl(var(--alien-green))",
-        },
-        plasma: {
-          purple: "hsl(var(--plasma-purple))",
-        },
+        rope: "hsl(var(--rope))",
+        "pirate-red": "hsl(var(--pirate-red))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

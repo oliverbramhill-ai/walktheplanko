@@ -8,18 +8,18 @@ import { WinnerBanner } from './WinnerBanner';
 import { NameSlots } from './NameSlots';
 
 const DEFAULT_NAMES = [
-  'Nova', 'Orion', 'Luna', 'Vega', 'Cosmo', 'Stella', 'Nebula', 'Quasar', 'Astro'
+  'Oliver', 'David', 'Alina', 'Camille', 'James', 'Adri', 'Ross', 'Luke', 'Romain'
 ];
 
 const BOARD_WIDTH = 700;
 const BOARD_HEIGHT = 600;
 const PEG_RADIUS = 6;
-const BALL_RADIUS = 7;
+const BALL_RADIUS = 7; // Reduced by 30% from 10
 
-// Grid configuration
-const GRID_MARGIN = BOARD_WIDTH * 0.02;
+// Grid configuration - reduced margin for edge coverage
+const GRID_MARGIN = BOARD_WIDTH * 0.02; // 2% margin on each side
 const GRID_WIDTH = BOARD_WIDTH - (GRID_MARGIN * 2);
-const PEG_COLS = 13;
+const PEG_COLS = 13; // More columns for denser coverage
 const PEG_SPACING = GRID_WIDTH / (PEG_COLS - 1);
 const PEG_ROWS = 12;
 
@@ -39,22 +39,18 @@ export const PlinkoGame = () => {
   const engineRef = useRef<Matter.Engine | null>(null);
   const renderRef = useRef<Matter.Render | null>(null);
   const runnerRef = useRef<Matter.Runner | null>(null);
-  const slotWallsRef = useRef<Matter.Body[]>([]);
-  const scrollOffsetRef = useRef(0);
-  const scrollAnimationRef = useRef<number | null>(null);
   
   
   const [names, setNames] = useState<string[]>(DEFAULT_NAMES);
   const [scores, setScores] = useState<Record<string, number>>({});
-  const dropCounts = useMemo(() => names.map(() => 15), [names]);
+  const dropCounts = useMemo(() => names.map(() => 15), [names]); // Fixed at 15 per zone
   const [isDropping, setIsDropping] = useState(false);
   const [winner, setWinner] = useState<string | null>(null);
   const [activeBalls, setActiveBalls] = useState(0);
   const [isShaking, setIsShaking] = useState(false);
-  const [scrollOffset, setScrollOffset] = useState(0);
   
-  const [acePilot, setAcePilot] = useState<string | null>(null);
-  const [acePilotEnabled, setAcePilotEnabled] = useState(false);
+  const [luckySailor, setLuckySailor] = useState<string | null>(null);
+  const [luckySailorEnabled, setLuckySailorEnabled] = useState(false);
   
   const sounds = usePlinkoSounds();
   const ballCountRef = useRef(0);
@@ -63,25 +59,25 @@ export const PlinkoGame = () => {
   const scoresRef = useRef<Record<string, number>>({});
   const hasAnnouncedWinnerRef = useRef(false);
 
-  // Calculate slot widths with Ace Pilot adjustment
+  // Calculate slot widths with Lucky Sailor adjustment
   const getSlotWidths = useCallback(() => {
-    if (!acePilotEnabled || !acePilot) {
+    if (!luckySailorEnabled || !luckySailor) {
       return names.map(() => 100 / names.length);
     }
     
-    const pilotIndex = names.indexOf(acePilot);
-    if (pilotIndex === -1) {
+    const luckyIndex = names.indexOf(luckySailor);
+    if (luckyIndex === -1) {
       return names.map(() => 100 / names.length);
     }
     
     const normalWidth = 100 / names.length;
-    const pilotWidth = normalWidth / 2;
-    const extraWidth = (normalWidth - pilotWidth) / (names.length - 1);
+    const luckyWidth = normalWidth / 2;
+    const extraWidth = (normalWidth - luckyWidth) / (names.length - 1);
     
     return names.map((name) => 
-      name === acePilot ? pilotWidth : normalWidth + extraWidth
+      name === luckySailor ? luckyWidth : normalWidth + extraWidth
     );
-  }, [names, acePilot, acePilotEnabled]);
+  }, [names, luckySailor, luckySailorEnabled]);
 
   const initializeScores = useCallback(() => {
     const initialScores: Record<string, number> = {};
@@ -99,7 +95,7 @@ export const PlinkoGame = () => {
 
   const createPegs = (world: Matter.World) => {
     const pegs: Matter.Body[] = [];
-    const startY = 90;
+    const startY = 90; // Moved down to give balls room to escape at top
     const rowSpacing = (BOARD_HEIGHT - 150) / PEG_ROWS;
     
     for (let row = 0; row < PEG_ROWS; row++) {
@@ -116,7 +112,7 @@ export const PlinkoGame = () => {
           restitution: 0.8,
           friction: 0.05,
           render: {
-            fillStyle: '#00ffff',
+            fillStyle: '#C4A45F',
           },
           label: 'peg',
         });
@@ -136,7 +132,6 @@ export const PlinkoGame = () => {
   }, [getSlotWidths]);
   const createSlotWalls = (world: Matter.World) => {
     const walls: Matter.Body[] = [];
-    const dividerWalls: Matter.Body[] = [];
     const slotTop = BOARD_HEIGHT - 80;
     const slotWidths = getSlotWidths();
     
@@ -144,24 +139,22 @@ export const PlinkoGame = () => {
     walls.push(
       Matter.Bodies.rectangle(-10, BOARD_HEIGHT / 2, 20, BOARD_HEIGHT, {
         isStatic: true,
-        render: { fillStyle: '#1a1a3e' },
+        render: { fillStyle: '#5a3921' },
       }),
       Matter.Bodies.rectangle(BOARD_WIDTH + 10, BOARD_HEIGHT / 2, 20, BOARD_HEIGHT, {
         isStatic: true,
-        render: { fillStyle: '#1a1a3e' },
+        render: { fillStyle: '#5a3921' },
       })
     );
     
-    // Create slot divider walls - we'll animate these
     let currentX = 0;
     for (let i = 0; i <= names.length; i++) {
       const x = i === 0 ? 0 : currentX;
       const wall = Matter.Bodies.rectangle(x, slotTop + 40, 6, 80, {
         isStatic: true,
-        render: { fillStyle: '#6366f1' },
-        label: 'slotWall',
+        render: { fillStyle: '#5a3921' },
       });
-      dividerWalls.push(wall);
+      walls.push(wall);
       
       if (i < names.length) {
         currentX += (slotWidths[i] / 100) * BOARD_WIDTH;
@@ -171,43 +164,14 @@ export const PlinkoGame = () => {
     walls.push(
       Matter.Bodies.rectangle(BOARD_WIDTH / 2, BOARD_HEIGHT + 10, BOARD_WIDTH, 20, {
         isStatic: true,
-        render: { fillStyle: '#1a1a3e' },
+        render: { fillStyle: '#5a3921' },
         label: 'bottom',
       })
     );
     
-    Matter.Composite.add(world, [...walls, ...dividerWalls]);
-    slotWallsRef.current = dividerWalls;
+    Matter.Composite.add(world, walls);
     return walls;
   };
-
-  // Update slot wall positions based on scroll offset
-  const updateSlotWallPositions = useCallback((offset: number) => {
-    if (!slotWallsRef.current.length) return;
-    
-    const slotWidths = getSlotWidths();
-    const totalWidth = BOARD_WIDTH;
-    
-    // Normalize offset to be within 0 to totalWidth
-    const normalizedOffset = ((offset % totalWidth) + totalWidth) % totalWidth;
-    
-    let baseX = 0;
-    slotWallsRef.current.forEach((wall, i) => {
-      if (i === 0) {
-        // First wall position
-        let newX = -normalizedOffset;
-        if (newX < -totalWidth / 2) newX += totalWidth;
-        Matter.Body.setPosition(wall, { x: newX, y: wall.position.y });
-      } else {
-        baseX += (slotWidths[i - 1] / 100) * totalWidth;
-        let newX = baseX - normalizedOffset;
-        // Wrap around
-        if (newX < -totalWidth / 2) newX += totalWidth;
-        if (newX > totalWidth + totalWidth / 2) newX -= totalWidth;
-        Matter.Body.setPosition(wall, { x: newX, y: wall.position.y });
-      }
-    });
-  }, [getSlotWidths]);
 
   const setupCollisionDetection = (engine: Matter.Engine) => {
     Matter.Events.on(engine, 'collisionStart', (event) => {
@@ -224,28 +188,19 @@ export const PlinkoGame = () => {
           const ball = pair.bodyA.label === 'ball' ? pair.bodyA : pair.bodyB;
           const landedBall = ball as any;
           
+          // Ignore repeated bottom hits from the same ball
           if (landedBall.hasLanded) {
             return;
           }
           landedBall.hasLanded = true;
           
           const slotWidths = getSlotWidths();
-          const totalWidth = BOARD_WIDTH;
-          
-          // Account for scroll offset when determining slot
-          const currentOffset = scrollOffsetRef.current;
-          const normalizedOffset = ((currentOffset % totalWidth) + totalWidth) % totalWidth;
-          
-          // Adjust ball position by adding back the offset to find "virtual" position
-          let virtualX = ball.position.x + normalizedOffset;
-          if (virtualX >= totalWidth) virtualX -= totalWidth;
-          
           let accumulatedWidth = 0;
           let slotIndex = 0;
           
           for (let i = 0; i < names.length; i++) {
             const slotPixelWidth = (slotWidths[i] / 100) * BOARD_WIDTH;
-            if (virtualX < accumulatedWidth + slotPixelWidth) {
+            if (ball.position.x < accumulatedWidth + slotPixelWidth) {
               slotIndex = i;
               break;
             }
@@ -286,6 +241,7 @@ export const PlinkoGame = () => {
   };
 
   const checkWinner = () => {
+    // Don't announce twice
     if (hasAnnouncedWinnerRef.current) return;
     
     const currentScores = scoresRef.current;
@@ -314,14 +270,14 @@ export const PlinkoGame = () => {
           angle: 60,
           spread: 55,
           origin: { x: 0, y: 0.7 },
-          colors: ['#00ffff', '#ff00ff', '#6366f1', '#8b5cf6', '#ec4899'],
+          colors: ['#FFD700', '#DAA520', '#8B4513', '#CD853F', '#DEB887'],
         });
         confetti({
           particleCount: 5,
           angle: 120,
           spread: 55,
           origin: { x: 1, y: 0.7 },
-          colors: ['#00ffff', '#ff00ff', '#6366f1', '#8b5cf6', '#ec4899'],
+          colors: ['#FFD700', '#DAA520', '#8B4513', '#CD853F', '#DEB887'],
         });
         
         if (Date.now() < end) {
@@ -334,52 +290,15 @@ export const PlinkoGame = () => {
     setIsDropping(false);
   };
 
-  // Start/stop scroll animation based on isDropping
-  useEffect(() => {
-    if (isDropping) {
-      const scrollSpeed = 1.5; // pixels per frame
-      let lastTime = performance.now();
-      
-      const animate = (currentTime: number) => {
-        const delta = currentTime - lastTime;
-        lastTime = currentTime;
-        
-        scrollOffsetRef.current += scrollSpeed * (delta / 16.67); // Normalize to ~60fps
-        const normalizedOffset = scrollOffsetRef.current % BOARD_WIDTH;
-        
-        setScrollOffset(normalizedOffset);
-        updateSlotWallPositions(scrollOffsetRef.current);
-        
-        scrollAnimationRef.current = requestAnimationFrame(animate);
-      };
-      
-      scrollAnimationRef.current = requestAnimationFrame(animate);
-    } else {
-      if (scrollAnimationRef.current) {
-        cancelAnimationFrame(scrollAnimationRef.current);
-        scrollAnimationRef.current = null;
-      }
-      // Reset scroll position when not dropping
-      scrollOffsetRef.current = 0;
-      setScrollOffset(0);
-      updateSlotWallPositions(0);
-    }
-    
-    return () => {
-      if (scrollAnimationRef.current) {
-        cancelAnimationFrame(scrollAnimationRef.current);
-      }
-    };
-  }, [isDropping, updateSlotWallPositions]);
-
 
   useEffect(() => {
     if (!canvasRef.current) return;
 
     const engine = Matter.Engine.create({
-      gravity: { x: 0, y: 0.4 },
+      gravity: { x: 0, y: 0.8 },
     });
     
+    // Increase ball-to-ball restitution for more bounce
     engine.world.bodies.forEach(body => {
       if (body.label === 'ball') {
         body.restitution = 0.85;
@@ -434,7 +353,7 @@ export const PlinkoGame = () => {
       Matter.Runner.stop(runner);
       Matter.Engine.clear(engine);
     };
-  }, [names, acePilot, acePilotEnabled]);
+  }, [names, luckySailor, luckySailorEnabled]);
 
   const dropBall = (x: number) => {
     if (!engineRef.current) return;
@@ -447,8 +366,8 @@ export const PlinkoGame = () => {
       friction: 0.05,
       frictionAir: 0.015,
       render: {
-        fillStyle: '#ff6b35',
-        strokeStyle: '#ffaa00',
+        fillStyle: '#2a2a2a',
+        strokeStyle: '#4a4a4a',
         lineWidth: 2,
       },
       label: 'ball',
@@ -483,44 +402,29 @@ export const PlinkoGame = () => {
     setTimeout(() => setIsShaking(false), 500);
     
     const dropPositions = getDropPositions();
-    const remainingDrops = [...dropCounts];
     
-    // Build a sequence of drops: sweep left-to-right, then right-to-left
-    const dropSequence: number[] = [];
-    let goingRight = true;
+    const maxWaves = Math.max(...dropCounts);
+    let waveIndex = 0;
     
-    while (remainingDrops.some(count => count > 0)) {
-      const indices = goingRight 
-        ? [...Array(dropPositions.length).keys()]
-        : [...Array(dropPositions.length).keys()].reverse();
+    const dropWave = () => {
+      if (waveIndex >= maxWaves) return;
       
-      for (const zoneIndex of indices) {
-        if (remainingDrops[zoneIndex] > 0) {
-          dropSequence.push(zoneIndex);
-          remainingDrops[zoneIndex]--;
+      dropPositions.forEach((pos, zoneIndex) => {
+        if (waveIndex < dropCounts[zoneIndex]) {
+          setTimeout(() => {
+            dropBall(pos);
+            sounds.playDrop();
+          }, Math.random() * 100);
         }
-      }
-      goingRight = !goingRight;
-    }
-    
-    // Drop balls one at a time with steady delay
-    let dropIndex = 0;
-    const dropInterval = 100; // ms between each ball
-    
-    const dropNext = () => {
-      if (dropIndex >= dropSequence.length) return;
+      });
       
-      const zoneIndex = dropSequence[dropIndex];
-      dropBall(dropPositions[zoneIndex]);
-      sounds.playDrop();
-      
-      dropIndex++;
-      if (dropIndex < dropSequence.length) {
-        setTimeout(dropNext, dropInterval);
+      waveIndex++;
+      if (waveIndex < maxWaves) {
+        setTimeout(dropWave, 400);
       }
     };
     
-    dropNext();
+    dropWave();
   };
 
   const handleReset = () => {
@@ -547,7 +451,7 @@ export const PlinkoGame = () => {
 
   const addName = () => {
     if (names.length >= 10) return;
-    const newNames = [...names, `Pilot ${names.length + 1}`];
+    const newNames = [...names, `Crew ${names.length + 1}`];
     setNames(newNames);
   };
 
@@ -555,16 +459,16 @@ export const PlinkoGame = () => {
     if (names.length <= 4) return;
     const newNames = names.filter((_, i) => i !== index);
     setNames(newNames);
-    if (acePilot === names[index]) {
-      setAcePilot(null);
+    if (luckySailor === names[index]) {
+      setLuckySailor(null);
     }
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 items-start justify-center p-4 relative z-10">
+    <div className="flex flex-col lg:flex-row gap-6 items-start justify-center p-4">
       <div className="flex flex-col items-center gap-4">
-        <h1 className="text-4xl md:text-6xl font-space text-cyan-glow drop-shadow-[0_0_30px_hsl(180,100%,50%)] tracking-wider">
-          A-PLONK US! 👽
+        <h1 className="text-4xl md:text-6xl font-pirate text-primary drop-shadow-lg">
+          Walk the Plank-o! ☠️
         </h1>
         
         <DropZones 
@@ -575,49 +479,47 @@ export const PlinkoGame = () => {
         />
         
         <div className={`relative ${isShaking ? 'animate-shake' : ''}`}>
-          <div className="space-panel neon-border rounded-xl p-2">
+          <div className="wood-texture rope-border rounded-xl p-2">
             <canvas 
               ref={canvasRef} 
               className="rounded-lg"
               style={{ 
-                background: 'radial-gradient(ellipse at center, #1a1a3e 0%, #0a0a1f 100%)',
+                background: 'linear-gradient(180deg, #1a3a5c 0%, #0f2942 100%)',
               }}
             />
             <NameSlots 
               names={names} 
               scores={scores} 
               slotWidths={getSlotWidths()}
-              acePilot={acePilotEnabled ? acePilot : null}
-              scrollOffset={scrollOffset}
-              boardWidth={BOARD_WIDTH}
+              luckySailor={luckySailorEnabled ? luckySailor : null}
             />
           </div>
           
-          <div className="absolute -top-4 -left-4 text-3xl animate-float">🛸</div>
-          <div className="absolute -top-4 -right-4 text-3xl animate-orbit" style={{ animationDelay: '1s' }}>🌟</div>
-          <div className="absolute -bottom-4 -left-4 text-2xl animate-twinkle">👾</div>
-          <div className="absolute -bottom-4 -right-4 text-2xl animate-float" style={{ animationDelay: '0.5s' }}>🪐</div>
+          <div className="absolute -top-4 -left-4 text-3xl animate-float">⚓</div>
+          <div className="absolute -top-4 -right-4 text-3xl animate-float" style={{ animationDelay: '1s' }}>🏴‍☠️</div>
+          <div className="absolute -bottom-4 -left-4 text-2xl animate-wave">🦜</div>
+          <div className="absolute -bottom-4 -right-4 text-2xl animate-wave" style={{ animationDelay: '0.5s' }}>💰</div>
         </div>
         
         <div className="flex gap-4 flex-wrap justify-center">
           <button 
             onClick={handleDrop}
             disabled={isDropping}
-            className="space-button text-xl disabled:opacity-50 disabled:cursor-not-allowed"
+            className="pirate-button text-xl disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            🚀 LAUNCH METEORS!
+            🎯 DROP THE CANNONBALLS!
           </button>
           <button 
             onClick={handleReset}
-            className="space-button-pink text-xl"
+            className="pirate-button-red text-xl"
           >
-            🔄 RESET GALAXY
+            🔄 RESET BOARD
           </button>
         </div>
         
         {activeBalls > 0 && (
-          <p className="text-lg font-space text-cyan-glow drop-shadow-[0_0_10px_hsl(180,100%,50%)]">
-            ☄️ Meteors in orbit: {activeBalls}
+          <p className="text-lg font-pirate text-gold">
+            ⚫ Balls in play: {activeBalls}
           </p>
         )}
       </div>
@@ -625,29 +527,29 @@ export const PlinkoGame = () => {
       <div className="flex flex-col gap-4">
         <Scoreboard names={names} scores={scores} />
         
-        <div className="hologram-bg rounded-xl p-4 neon-border">
-          <h3 className="font-space text-xl text-cyan-glow mb-3">⚙️ Mission Settings</h3>
+        <div className="parchment-bg rounded-xl p-4 rope-border">
+          <h3 className="font-pirate text-xl text-wood-dark mb-3">⚙️ Game Options</h3>
           
           <div className="flex flex-col gap-3">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
-                checked={acePilotEnabled}
-                onChange={(e) => setAcePilotEnabled(e.target.checked)}
+                checked={luckySailorEnabled}
+                onChange={(e) => setLuckySailorEnabled(e.target.checked)}
                 disabled={isDropping}
-                className="w-4 h-4 accent-cyan-400"
+                className="w-4 h-4"
               />
-              <span className="text-star-white font-semibold">🎯 Ace Pilot Mode</span>
+              <span className="text-wood-dark font-semibold">🍀 Lucky Sailor Mode</span>
             </label>
             
-            {acePilotEnabled && (
+            {luckySailorEnabled && (
               <select
-                value={acePilot || ''}
-                onChange={(e) => setAcePilot(e.target.value || null)}
+                value={luckySailor || ''}
+                onChange={(e) => setLuckySailor(e.target.value || null)}
                 disabled={isDropping}
-                className="px-2 py-1 rounded bg-space-deep text-star-white text-sm border border-cyan-glow/50 focus:border-cyan-glow focus:outline-none"
+                className="px-2 py-1 rounded bg-wood-dark text-parchment text-sm border border-rope"
               >
-                <option value="">Select Ace Pilot...</option>
+                <option value="">Select Lucky Sailor...</option>
                 {names.map((name) => (
                   <option key={name} value={name}>{name}</option>
                 ))}
@@ -656,9 +558,9 @@ export const PlinkoGame = () => {
           </div>
         </div>
         
-        <div className="hologram-bg rounded-xl p-4 neon-border">
+        <div className="parchment-bg rounded-xl p-4 rope-border">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="font-space text-xl text-cyan-glow">Edit Crew Names</h3>
+            <h3 className="font-pirate text-xl text-wood-dark">Edit Crew Names</h3>
             <div className="flex gap-2">
               <button
                 onClick={() => {
@@ -666,20 +568,20 @@ export const PlinkoGame = () => {
                   setNames(shuffled);
                 }}
                 disabled={isDropping}
-                className="text-sm px-3 py-1 rounded bg-space-deep text-star-white font-space hover:bg-nebula-purple/30 transition-colors disabled:opacity-50 border border-cyan-glow/30"
+                className="text-sm px-3 py-1 rounded bg-wood-dark text-parchment font-pirate hover:bg-wood-mid transition-colors disabled:opacity-50"
               >
                 🔀 Shuffle
               </button>
               <button
                 onClick={addName}
                 disabled={isDropping || names.length >= 10}
-                className="text-sm px-3 py-1 rounded bg-alien-green/20 text-alien-green font-space hover:bg-alien-green/30 transition-colors disabled:opacity-50 border border-alien-green/50"
+                className="text-sm px-3 py-1 rounded bg-green-700 text-parchment font-pirate hover:bg-green-600 transition-colors disabled:opacity-50"
               >
                 + Add
               </button>
             </div>
           </div>
-          <p className="text-xs text-cyan-light mb-2">({names.length}/10 crew members)</p>
+          <p className="text-xs text-wood-mid mb-2">({names.length}/10 crew members)</p>
           <div className="grid grid-cols-3 gap-2">
             {names.map((name, index) => (
               <div key={index} className="flex gap-1">
@@ -691,14 +593,14 @@ export const PlinkoGame = () => {
                     newNames[index] = e.target.value;
                     setNames(newNames);
                   }}
-                  className="flex-1 px-2 py-1 rounded bg-space-deep text-star-white text-sm border border-cyan-glow/30 focus:outline-none focus:ring-2 focus:ring-cyan-glow"
+                  className="flex-1 px-2 py-1 rounded bg-wood-dark text-parchment text-sm border border-rope focus:outline-none focus:ring-2 focus:ring-gold"
                   disabled={isDropping}
                 />
                 {names.length > 4 && (
                   <button
                     onClick={() => removeName(index)}
                     disabled={isDropping}
-                    className="px-2 py-1 rounded bg-nebula-pink/20 text-nebula-pink text-xs hover:bg-nebula-pink/30 disabled:opacity-50 border border-nebula-pink/50"
+                    className="px-2 py-1 rounded bg-red-700 text-parchment text-xs hover:bg-red-600 disabled:opacity-50"
                   >
                     ✕
                   </button>
