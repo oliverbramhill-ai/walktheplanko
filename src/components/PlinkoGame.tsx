@@ -51,6 +51,8 @@ export const PlinkoGame = () => {
   
   const [luckySailor, setLuckySailor] = useState<string | null>(null);
   const [luckySailorEnabled, setLuckySailorEnabled] = useState(false);
+  const [unluckySailor, setUnluckySailor] = useState<string | null>(null);
+  const [unluckySailorEnabled, setUnluckySailorEnabled] = useState(false);
   
   const sounds = usePlinkoSounds();
   const ballCountRef = useRef(0);
@@ -59,25 +61,43 @@ export const PlinkoGame = () => {
   const scoresRef = useRef<Record<string, number>>({});
   const hasAnnouncedWinnerRef = useRef(false);
 
-  // Calculate slot widths with Lucky Sailor adjustment
+  // Calculate slot widths with Lucky/Unlucky Sailor adjustments
   const getSlotWidths = useCallback(() => {
-    if (!luckySailorEnabled || !luckySailor) {
-      return names.map(() => 100 / names.length);
-    }
-    
-    const luckyIndex = names.indexOf(luckySailor);
-    if (luckyIndex === -1) {
-      return names.map(() => 100 / names.length);
-    }
-    
     const normalWidth = 100 / names.length;
-    const luckyWidth = normalWidth / 2;
-    const extraWidth = (normalWidth - luckyWidth) / (names.length - 1);
     
-    return names.map((name) => 
-      name === luckySailor ? luckyWidth : normalWidth + extraWidth
-    );
-  }, [names, luckySailor, luckySailorEnabled]);
+    const hasLucky = luckySailorEnabled && luckySailor && names.includes(luckySailor);
+    const hasUnlucky = unluckySailorEnabled && unluckySailor && names.includes(unluckySailor);
+    
+    if (!hasLucky && !hasUnlucky) {
+      return names.map(() => normalWidth);
+    }
+    
+    // Calculate adjustments
+    let luckyAdjustment = 0;
+    let unluckyAdjustment = 0;
+    
+    if (hasLucky) {
+      luckyAdjustment = normalWidth / 2; // Lucky loses half their width
+    }
+    if (hasUnlucky) {
+      unluckyAdjustment = normalWidth / 2; // Unlucky gains half more width
+    }
+    
+    // Net adjustment to distribute among others
+    const netAdjustment = luckyAdjustment - unluckyAdjustment;
+    const othersCount = names.length - (hasLucky ? 1 : 0) - (hasUnlucky ? 1 : 0);
+    const otherAdjustment = othersCount > 0 ? netAdjustment / othersCount : 0;
+    
+    return names.map((name) => {
+      if (hasLucky && name === luckySailor) {
+        return normalWidth / 2; // Half width
+      }
+      if (hasUnlucky && name === unluckySailor) {
+        return normalWidth * 1.5; // 50% larger
+      }
+      return normalWidth + otherAdjustment;
+    });
+  }, [names, luckySailor, luckySailorEnabled, unluckySailor, unluckySailorEnabled]);
 
   const initializeScores = useCallback(() => {
     const initialScores: Record<string, number> = {};
@@ -353,7 +373,7 @@ export const PlinkoGame = () => {
       Matter.Runner.stop(runner);
       Matter.Engine.clear(engine);
     };
-  }, [names, luckySailor, luckySailorEnabled]);
+  }, [names, luckySailor, luckySailorEnabled, unluckySailor, unluckySailorEnabled]);
 
   const dropBall = (x: number) => {
     if (!engineRef.current) return;
@@ -457,10 +477,14 @@ export const PlinkoGame = () => {
 
   const removeName = (index: number) => {
     if (names.length <= 4) return;
+    const removedName = names[index];
     const newNames = names.filter((_, i) => i !== index);
     setNames(newNames);
-    if (luckySailor === names[index]) {
+    if (luckySailor === removedName) {
       setLuckySailor(null);
+    }
+    if (unluckySailor === removedName) {
+      setUnluckySailor(null);
     }
   };
 
@@ -492,6 +516,7 @@ export const PlinkoGame = () => {
               scores={scores} 
               slotWidths={getSlotWidths()}
               luckySailor={luckySailorEnabled ? luckySailor : null}
+              unluckySailor={unluckySailorEnabled ? unluckySailor : null}
             />
           </div>
           
@@ -521,8 +546,33 @@ export const PlinkoGame = () => {
           <p className="text-lg font-pirate text-gold">
             ⚫ Balls in play: {activeBalls}
           </p>
-        )}
-      </div>
+            )}
+            
+            <label className="flex items-center gap-2 cursor-pointer mt-2">
+              <input
+                type="checkbox"
+                checked={unluckySailorEnabled}
+                onChange={(e) => setUnluckySailorEnabled(e.target.checked)}
+                disabled={isDropping}
+                className="w-4 h-4"
+              />
+              <span className="text-wood-dark font-semibold">💀 Unlucky Sailor Mode</span>
+            </label>
+            
+            {unluckySailorEnabled && (
+              <select
+                value={unluckySailor || ''}
+                onChange={(e) => setUnluckySailor(e.target.value || null)}
+                disabled={isDropping}
+                className="px-2 py-1 rounded bg-wood-dark text-parchment text-sm border border-rope"
+              >
+                <option value="">Select Unlucky Sailor...</option>
+                {names.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            )}
+          </div>
       
       <div className="flex flex-col gap-4">
         <Scoreboard names={names} scores={scores} />
