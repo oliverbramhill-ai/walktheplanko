@@ -77,7 +77,7 @@ export const PlinkoGame = () => {
     let unluckyAdjustment = 0;
     
     if (hasLucky) {
-      luckyAdjustment = normalWidth / 2; // Lucky loses half their width
+      luckyAdjustment = normalWidth * 0.15; // Lucky loses 15% of their width
     }
     if (hasUnlucky) {
       unluckyAdjustment = normalWidth / 2; // Unlucky gains half more width
@@ -90,7 +90,7 @@ export const PlinkoGame = () => {
     
     return names.map((name) => {
       if (hasLucky && name === luckySailor) {
-        return normalWidth / 2; // Half width
+        return normalWidth * 0.85; // 15% smaller
       }
       if (hasUnlucky && name === unluckySailor) {
         return normalWidth * 1.5; // 50% larger
