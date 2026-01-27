@@ -39,6 +39,7 @@ export const PlinkoGame = () => {
   const engineRef = useRef<Matter.Engine | null>(null);
   const renderRef = useRef<Matter.Render | null>(null);
   const runnerRef = useRef<Matter.Runner | null>(null);
+  const pegsRef = useRef<Matter.Body[]>([]);
   
   
   const [names, setNames] = useState<string[]>(DEFAULT_NAMES);
@@ -142,6 +143,7 @@ export const PlinkoGame = () => {
     }
     
     Matter.Composite.add(world, pegs);
+    pegsRef.current = pegs;
     return pegs;
   };
 
@@ -420,6 +422,11 @@ export const PlinkoGame = () => {
         engineRef.current.timing.timeScale = 0.25; // Very slow motion
       }
       
+      // Make pegs super bouncy for single ball mode
+      pegsRef.current.forEach(peg => {
+        peg.restitution = 1.5; // Extreme bounciness - ball bounces higher than it fell
+      });
+      
       setIsShaking(true);
       setTimeout(() => setIsShaking(false), 500);
       
@@ -434,6 +441,11 @@ export const PlinkoGame = () => {
     if (engineRef.current) {
       engineRef.current.timing.timeScale = 1;
     }
+    
+    // Reset pegs to normal bounciness for regular mode
+    pegsRef.current.forEach(peg => {
+      peg.restitution = 0.8;
+    });
     
     setIsShaking(true);
     setTimeout(() => setIsShaking(false), 500);
