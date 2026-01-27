@@ -48,6 +48,7 @@ export const PlinkoGame = () => {
   const [winner, setWinner] = useState<string | null>(null);
   const [activeBalls, setActiveBalls] = useState(0);
   const [isShaking, setIsShaking] = useState(false);
+  const [singleBallMode, setSingleBallMode] = useState(false);
   
   const [luckySailor, setLuckySailor] = useState<string | null>(null);
   const [luckySailorEnabled, setLuckySailorEnabled] = useState(false);
@@ -375,25 +376,25 @@ export const PlinkoGame = () => {
     };
   }, [names, luckySailor, luckySailorEnabled, unluckySailor, unluckySailorEnabled]);
 
-  const dropBall = (x: number) => {
+  const dropBall = (x: number, isSingleBall: boolean = false) => {
     if (!engineRef.current) return;
     
-    const randomOffsetX = (Math.random() - 0.5) * 30;
-    const randomVelocityX = (Math.random() - 0.5) * 2;
+    const randomOffsetX = isSingleBall ? 0 : (Math.random() - 0.5) * 30;
+    const randomVelocityX = isSingleBall ? 0 : (Math.random() - 0.5) * 2;
     
     const ball = Matter.Bodies.circle(x + randomOffsetX, -10, BALL_RADIUS, {
-      restitution: 0.85,
+      restitution: isSingleBall ? 0.98 : 0.85, // Extra bouncy for single ball
       friction: 0.05,
-      frictionAir: 0.015,
+      frictionAir: isSingleBall ? 0.03 : 0.015, // More air resistance for slower movement
       render: {
-        fillStyle: '#2a2a2a',
-        strokeStyle: '#4a4a4a',
+        fillStyle: isSingleBall ? '#FFD700' : '#2a2a2a', // Gold for single ball
+        strokeStyle: isSingleBall ? '#DAA520' : '#4a4a4a',
         lineWidth: 2,
       },
       label: 'ball',
     });
     
-    Matter.Body.setVelocity(ball, { x: randomVelocityX, y: 2 });
+    Matter.Body.setVelocity(ball, { x: randomVelocityX, y: isSingleBall ? 0.5 : 2 });
     Matter.Body.setAngularVelocity(ball, (Math.random() - 0.5) * 0.2);
     
     Matter.Composite.add(engineRef.current.world, ball);
@@ -410,6 +411,22 @@ export const PlinkoGame = () => {
     initializeScores();
     ballCountRef.current = 0;
     landedBallsRef.current = 0;
+    
+    // Single ball mode: just one ball from center with slow physics
+    if (singleBallMode) {
+      totalBallsToDropRef.current = 1;
+      
+      if (engineRef.current) {
+        engineRef.current.timing.timeScale = 0.25; // Very slow motion
+      }
+      
+      setIsShaking(true);
+      setTimeout(() => setIsShaking(false), 500);
+      
+      dropBall(BOARD_WIDTH / 2, true);
+      sounds.playDrop();
+      return;
+    }
     
     const totalBalls = dropCounts.reduce((sum, count) => sum + count, 0);
     totalBallsToDropRef.current = totalBalls;
@@ -581,6 +598,17 @@ export const PlinkoGame = () => {
           <h3 className="font-pirate text-xl text-wood-dark mb-3">⚙️ Game Options</h3>
           
           <div className="flex flex-col gap-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={singleBallMode}
+                onChange={(e) => setSingleBallMode(e.target.checked)}
+                disabled={isDropping}
+                className="w-4 h-4"
+              />
+              <span className="text-wood-dark font-semibold">🎱 Single Ball Mode</span>
+            </label>
+            
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
