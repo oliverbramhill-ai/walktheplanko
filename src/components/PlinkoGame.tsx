@@ -345,6 +345,24 @@ export const PlinkoGame = () => {
     createSlotWalls(engine.world);
     setupCollisionDetection(engine);
 
+    // Max velocity cap to prevent balls from flying off in single ball mode
+    const MAX_BALL_SPEED = 15;
+    Matter.Events.on(engine, 'beforeUpdate', () => {
+      const bodies = Matter.Composite.allBodies(engine.world);
+      bodies.forEach(body => {
+        if (body.label === 'ball') {
+          const speed = Math.sqrt(body.velocity.x ** 2 + body.velocity.y ** 2);
+          if (speed > MAX_BALL_SPEED) {
+            const scale = MAX_BALL_SPEED / speed;
+            Matter.Body.setVelocity(body, {
+              x: body.velocity.x * scale,
+              y: body.velocity.y * scale
+            });
+          }
+        }
+      });
+    });
+
     Matter.Render.run(render);
     Matter.Runner.run(runner, engine);
 
@@ -422,9 +440,9 @@ export const PlinkoGame = () => {
         engineRef.current.timing.timeScale = 0.25; // Very slow motion
       }
       
-      // Make pegs super bouncy for single ball mode
+      // Make pegs bouncy for single ball mode (but not too extreme)
       pegsRef.current.forEach(peg => {
-        peg.restitution = 1.5; // Extreme bounciness - ball bounces higher than it fell
+        peg.restitution = 1.25; // High bounciness but controlled
       });
       
       setIsShaking(true);
