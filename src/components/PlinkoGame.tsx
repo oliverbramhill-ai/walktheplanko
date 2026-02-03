@@ -172,6 +172,16 @@ export const PlinkoGame = () => {
       })
     );
     
+    // INVISIBLE TOP BOUNDARY - dampens bounce and sends ball back down
+    walls.push(
+      Matter.Bodies.rectangle(BOARD_WIDTH / 2, -15, BOARD_WIDTH + 40, 30, {
+        isStatic: true,
+        restitution: 0.3, // Low restitution to dampen bounce
+        render: { visible: false },
+        label: 'top-boundary',
+      })
+    );
+    
     let currentX = 0;
     for (let i = 0; i <= names.length; i++) {
       const x = i === 0 ? 0 : currentX;
