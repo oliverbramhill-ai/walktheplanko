@@ -476,8 +476,8 @@ export const PlinkoGame = () => {
   const dropBall = (x: number, isSingleBall: boolean = false) => {
     if (!engineRef.current) return;
     
-    const randomOffsetX = isSingleBall ? 0 : (Math.random() - 0.5) * 30;
-    const randomVelocityX = isSingleBall ? 0 : (Math.random() - 0.5) * 2;
+    const randomOffsetX = isSingleBall ? (Math.random() - 0.5) * 60 : (Math.random() - 0.5) * 30;
+    const randomVelocityX = isSingleBall ? (Math.random() - 0.5) * 4 : (Math.random() - 0.5) * 2;
     
     const ball = Matter.Bodies.circle(x + randomOffsetX, -10, BALL_RADIUS, {
       restitution: isSingleBall ? 0.98 : 0.85, // Extra bouncy for single ball
@@ -491,8 +491,8 @@ export const PlinkoGame = () => {
       label: 'ball',
     });
     
-    Matter.Body.setVelocity(ball, { x: randomVelocityX, y: isSingleBall ? 0.5 : 2 });
-    Matter.Body.setAngularVelocity(ball, (Math.random() - 0.5) * 0.2);
+    Matter.Body.setVelocity(ball, { x: randomVelocityX, y: isSingleBall ? 1 : 2 });
+    Matter.Body.setAngularVelocity(ball, (Math.random() - 0.5) * 0.4);
     
     Matter.Composite.add(engineRef.current.world, ball);
     ballCountRef.current++;
