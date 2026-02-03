@@ -173,14 +173,18 @@ export const PlinkoGame = () => {
     );
     
     // INVISIBLE TOP BOUNDARY - dampens bounce and sends ball back down
-    walls.push(
-      Matter.Bodies.rectangle(BOARD_WIDTH / 2, -15, BOARD_WIDTH + 40, 30, {
-        isStatic: true,
-        restitution: 0.3, // Low restitution to dampen bounce
-        render: { visible: false },
-        label: 'top-boundary',
-      })
-    );
+    // Starts with collisions disabled, activated after ball hits first peg
+    const topBoundary = Matter.Bodies.rectangle(BOARD_WIDTH / 2, -60, BOARD_WIDTH + 40, 30, {
+      isStatic: true,
+      restitution: 0.3, // Low restitution to dampen bounce
+      render: { visible: false },
+      label: 'top-boundary',
+      collisionFilter: {
+        category: 0x0002,
+        mask: 0x0000, // Initially doesn't collide with anything
+      },
+    });
+    walls.push(topBoundary);
     
     let currentX = 0;
     for (let i = 0; i <= names.length; i++) {
@@ -217,6 +221,16 @@ export const PlinkoGame = () => {
           sounds.playBounce();
           const ball = pair.bodyA.label === 'ball' ? pair.bodyA : pair.bodyB;
           Matter.Body.setAngularVelocity(ball, (Math.random() - 0.5) * 0.3);
+          
+          // Mark ball as having hit a peg and activate top boundary for it
+          (ball as any).hasHitPeg = true;
+          
+          // Find and activate the top boundary
+          const bodies = Matter.Composite.allBodies(engine.world);
+          const topBoundary = bodies.find(b => b.label === 'top-boundary');
+          if (topBoundary) {
+            topBoundary.collisionFilter.mask = 0xFFFF; // Now collides with everything
+          }
         }
         
         if (labels.includes('ball') && labels.includes('bottom')) {
@@ -508,6 +522,15 @@ export const PlinkoGame = () => {
     initializeScores();
     ballCountRef.current = 0;
     landedBallsRef.current = 0;
+    
+    // Reset top boundary to inactive state for new drop
+    if (engineRef.current) {
+      const bodies = Matter.Composite.allBodies(engineRef.current.world);
+      const topBoundary = bodies.find(b => b.label === 'top-boundary');
+      if (topBoundary) {
+        topBoundary.collisionFilter.mask = 0x0000; // Disable collisions until ball hits peg
+      }
+    }
     
     // Single ball mode: just one ball from center with slow physics
     if (singleBallMode) {
