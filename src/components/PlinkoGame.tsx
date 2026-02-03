@@ -36,10 +36,12 @@ const getSlotCenters = (slotWidths: number[], boardWidth: number): number[] => {
 
 export const PlinkoGame = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const trailCanvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<Matter.Engine | null>(null);
   const renderRef = useRef<Matter.Render | null>(null);
   const runnerRef = useRef<Matter.Runner | null>(null);
   const pegsRef = useRef<Matter.Body[]>([]);
+  const trailPositionsRef = useRef<{x: number, y: number, alpha: number}[]>([]);
   
   
   const [names, setNames] = useState<string[]>(DEFAULT_NAMES);
@@ -370,6 +372,70 @@ export const PlinkoGame = () => {
     renderRef.current = render;
     runnerRef.current = runner;
 
+    // Trail effect animation loop for single ball mode
+    let trailAnimationId: number;
+    const drawTrail = () => {
+      const trailCanvas = trailCanvasRef.current;
+      if (!trailCanvas) {
+        trailAnimationId = requestAnimationFrame(drawTrail);
+        return;
+      }
+      
+      const ctx = trailCanvas.getContext('2d');
+      if (!ctx) {
+        trailAnimationId = requestAnimationFrame(drawTrail);
+        return;
+      }
+      
+      // Clear canvas
+      ctx.clearRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
+      
+      // Get current ball position in single ball mode
+      const bodies = Matter.Composite.allBodies(engine.world);
+      const singleBall = bodies.find(b => b.label === 'ball' && b.render.fillStyle === '#FFD700');
+      
+      if (singleBall) {
+        // Add current position to trail
+        trailPositionsRef.current.push({
+          x: singleBall.position.x,
+          y: singleBall.position.y,
+          alpha: 1
+        });
+        
+        // Limit trail length
+        if (trailPositionsRef.current.length > 30) {
+          trailPositionsRef.current.shift();
+        }
+      }
+      
+      // Draw trail
+      trailPositionsRef.current.forEach((pos, i) => {
+        const alpha = (i / trailPositionsRef.current.length) * 0.8;
+        const size = BALL_RADIUS * (0.3 + (i / trailPositionsRef.current.length) * 0.7);
+        
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
+        ctx.fill();
+        
+        // Add glow effect
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, size * 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 180, 0, ${alpha * 0.3})`;
+        ctx.fill();
+      });
+      
+      // Fade out trail positions
+      trailPositionsRef.current = trailPositionsRef.current.map(pos => ({
+        ...pos,
+        alpha: pos.alpha * 0.95
+      })).filter(pos => pos.alpha > 0.01);
+      
+      trailAnimationId = requestAnimationFrame(drawTrail);
+    };
+    
+    trailAnimationId = requestAnimationFrame(drawTrail);
+
     // Bump detection: nudge stationary balls (including top row area)
     const bumpInterval = setInterval(() => {
       const bodies = Matter.Composite.allBodies(engine.world);
@@ -390,6 +456,7 @@ export const PlinkoGame = () => {
 
     return () => {
       clearInterval(bumpInterval);
+      cancelAnimationFrame(trailAnimationId);
       Matter.Render.stop(render);
       Matter.Runner.stop(runner);
       Matter.Engine.clear(engine);
@@ -523,7 +590,7 @@ export const PlinkoGame = () => {
   };
 
   const removeName = (index: number) => {
-    if (names.length <= 4) return;
+    if (names.length <= 2) return;
     const removedName = names[index];
     const newNames = names.filter((_, i) => i !== index);
     setNames(newNames);
@@ -551,13 +618,22 @@ export const PlinkoGame = () => {
         
         <div className={`relative ${isShaking ? 'animate-shake' : ''}`}>
           <div className="wood-texture rope-border rounded-xl p-2">
-            <canvas 
-              ref={canvasRef} 
-              className="rounded-lg"
-              style={{ 
-                background: 'linear-gradient(180deg, #1a3a5c 0%, #0f2942 100%)',
-              }}
-            />
+            <div className="relative">
+              <canvas 
+                ref={canvasRef} 
+                className="rounded-lg"
+                style={{ 
+                  background: 'linear-gradient(180deg, #1a3a5c 0%, #0f2942 100%)',
+                }}
+              />
+              <canvas 
+                ref={trailCanvasRef}
+                width={BOARD_WIDTH}
+                height={BOARD_HEIGHT}
+                className="rounded-lg absolute top-0 left-0 pointer-events-none"
+                style={{ zIndex: 10 }}
+              />
+            </div>
             <NameSlots 
               names={names} 
               scores={scores} 
@@ -704,7 +780,7 @@ export const PlinkoGame = () => {
                   className="flex-1 px-2 py-1 rounded bg-wood-dark text-parchment text-sm border border-rope focus:outline-none focus:ring-2 focus:ring-gold"
                   disabled={isDropping}
                 />
-                {names.length > 4 && (
+                {names.length > 2 && (
                   <button
                     onClick={() => removeName(index)}
                     disabled={isDropping}
