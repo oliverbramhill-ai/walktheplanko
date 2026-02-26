@@ -44,19 +44,33 @@ export const PlinkoGame = () => {
   const trailPositionsRef = useRef<{x: number, y: number, alpha: number}[]>([]);
   
   
-  const [names, setNames] = useState<string[]>(DEFAULT_NAMES);
-  const [scores, setScores] = useState<Record<string, number>>({});
+  const [names, setNames] = useState<string[]>(() => {
+    try { const v = localStorage.getItem('plinko-names'); return v ? JSON.parse(v) : DEFAULT_NAMES; } catch { return DEFAULT_NAMES; }
+  });
+  const [scores, setScores] = useState<Record<string, number>>(() => {
+    try { const v = localStorage.getItem('plinko-scores'); return v ? JSON.parse(v) : {}; } catch { return {}; }
+  });
   const dropCounts = useMemo(() => names.map(() => 15), [names]); // Fixed at 15 per zone
   const [isDropping, setIsDropping] = useState(false);
   const [winner, setWinner] = useState<string | null>(null);
   const [activeBalls, setActiveBalls] = useState(0);
   const [isShaking, setIsShaking] = useState(false);
-  const [singleBallMode, setSingleBallMode] = useState(false);
+  const [singleBallMode, setSingleBallMode] = useState(() => {
+    try { return localStorage.getItem('plinko-singleBallMode') === 'true'; } catch { return false; }
+  });
   
-  const [luckySailor, setLuckySailor] = useState<string | null>(null);
-  const [luckySailorEnabled, setLuckySailorEnabled] = useState(false);
-  const [unluckySailor, setUnluckySailor] = useState<string | null>(null);
-  const [unluckySailorEnabled, setUnluckySailorEnabled] = useState(false);
+  const [luckySailor, setLuckySailor] = useState<string | null>(() => {
+    try { return localStorage.getItem('plinko-luckySailor') || null; } catch { return null; }
+  });
+  const [luckySailorEnabled, setLuckySailorEnabled] = useState(() => {
+    try { return localStorage.getItem('plinko-luckySailorEnabled') === 'true'; } catch { return false; }
+  });
+  const [unluckySailor, setUnluckySailor] = useState<string | null>(() => {
+    try { return localStorage.getItem('plinko-unluckySailor') || null; } catch { return null; }
+  });
+  const [unluckySailorEnabled, setUnluckySailorEnabled] = useState(() => {
+    try { return localStorage.getItem('plinko-unluckySailorEnabled') === 'true'; } catch { return false; }
+  });
   
   const sounds = usePlinkoSounds();
   const ballCountRef = useRef(0);
@@ -65,7 +79,15 @@ export const PlinkoGame = () => {
   const scoresRef = useRef<Record<string, number>>({});
   const hasAnnouncedWinnerRef = useRef(false);
 
-  // Calculate slot widths with Lucky/Unlucky Sailor adjustments
+  // Persist state to localStorage
+  useEffect(() => { localStorage.setItem('plinko-names', JSON.stringify(names)); }, [names]);
+  useEffect(() => { localStorage.setItem('plinko-scores', JSON.stringify(scores)); }, [scores]);
+  useEffect(() => { localStorage.setItem('plinko-singleBallMode', String(singleBallMode)); }, [singleBallMode]);
+  useEffect(() => { localStorage.setItem('plinko-luckySailor', luckySailor || ''); }, [luckySailor]);
+  useEffect(() => { localStorage.setItem('plinko-luckySailorEnabled', String(luckySailorEnabled)); }, [luckySailorEnabled]);
+  useEffect(() => { localStorage.setItem('plinko-unluckySailor', unluckySailor || ''); }, [unluckySailor]);
+  useEffect(() => { localStorage.setItem('plinko-unluckySailorEnabled', String(unluckySailorEnabled)); }, [unluckySailorEnabled]);
+
   const getSlotWidths = useCallback(() => {
     const normalWidth = 100 / names.length;
     
