@@ -4,8 +4,10 @@ import confetti from 'canvas-confetti';
 import { usePlinkoSounds } from '@/hooks/usePlinkoSounds';
 import { DropZones } from './DropZones';
 import { Scoreboard } from './Scoreboard';
+import { StatsPanel } from './StatsPanel';
 import { WinnerBanner } from './WinnerBanner';
 import { NameSlots } from './NameSlots';
+import { recordResult } from '@/lib/stats';
 
 const DEFAULT_NAMES = [
   'Oliver', 'David', 'Alina', 'Camille', 'James', 'Adri', 'Ross', 'Luke', 'Romain'
@@ -53,6 +55,8 @@ export const PlinkoGame = () => {
   const dropCounts = useMemo(() => names.map(() => 15), [names]); // Fixed at 15 per zone
   const [isDropping, setIsDropping] = useState(false);
   const [winner, setWinner] = useState<string | null>(null);
+  const [showStats, setShowStats] = useState(false);
+  const [statsRefreshKey, setStatsRefreshKey] = useState(0);
   const [activeBalls, setActiveBalls] = useState(0);
   const [isShaking, setIsShaking] = useState(false);
   const [singleBallMode, setSingleBallMode] = useState(() => {
@@ -328,6 +332,7 @@ export const PlinkoGame = () => {
     
     if (winnerName && maxScore > 0) {
       hasAnnouncedWinnerRef.current = true;
+      recordResult(winnerName, names).then(() => setStatsRefreshKey(k => k + 1));
       setWinner(winnerName);
       sounds.playWinner();
       sounds.playArrr();
@@ -712,11 +717,17 @@ export const PlinkoGame = () => {
           >
             🎯 DROP THE CANNONBALLS!
           </button>
-          <button 
+          <button
             onClick={handleReset}
             className="pirate-button-red text-xl"
           >
             🔄 RESET BOARD
+          </button>
+          <button
+            onClick={() => setShowStats(s => !s)}
+            className="pirate-button text-xl"
+          >
+            📊 {showStats ? 'HIDE STATS' : 'SHOW STATS'}
           </button>
         </div>
         
@@ -754,6 +765,7 @@ export const PlinkoGame = () => {
       
       <div className="flex flex-col gap-4">
         <Scoreboard names={names} scores={scores} />
+        {showStats && <StatsPanel refreshKey={statsRefreshKey} />}
         
         <div className="parchment-bg rounded-xl p-4 rope-border">
           <h3 className="font-pirate text-xl text-wood-dark mb-3">⚙️ Game Options</h3>
