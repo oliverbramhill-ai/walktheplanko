@@ -4,13 +4,17 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { statsPlugin } from "./vite-plugin-stats";
 
-// https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  base: mode === "production" ? "/warlktheplanko/" : "/",
   server: {
     host: "localhost",
     port: 8080,
   },
-  plugins: [react(), mode === "development" && componentTagger(), statsPlugin()].filter(Boolean),
+  plugins: [
+    react(),
+    mode === "development" && componentTagger(),
+    mode === "development" && statsPlugin(),
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
