@@ -22,29 +22,28 @@ export interface StatsData {
   noGameDays: number;
 }
 
-// --- File-backed API ---
+// --- localStorage-backed API ---
+
+const STATS_KEY = 'plinko-stats';
 
 export const loadStats = async (): Promise<StatsData> => {
-  const res = await fetch('/api/stats');
-  return res.json();
+  const raw = localStorage.getItem(STATS_KEY);
+  if (!raw) return { history: [], noGameDays: 0 };
+  try {
+    return JSON.parse(raw) as StatsData;
+  } catch {
+    return { history: [], noGameDays: 0 };
+  }
 };
 
 export const recordResult = async (name: string, attendees: string[]): Promise<void> => {
   const data = await loadStats();
   data.history.push({ name, timestamp: new Date().toISOString(), attendees });
-  await fetch('/api/stats', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
+  localStorage.setItem(STATS_KEY, JSON.stringify(data));
 };
 
 export const clearHistory = async (): Promise<void> => {
-  await fetch('/api/stats', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ history: [], noGameDays: 0 }),
-  });
+  localStorage.setItem(STATS_KEY, JSON.stringify({ history: [], noGameDays: 0 }));
 };
 
 export const getTotalWorkDays = (historyLength: number, noGameDays: number): number => {
