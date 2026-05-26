@@ -25,14 +25,15 @@ export interface StatsData {
 // --- localStorage-backed API ---
 
 const STATS_KEY = 'plinko-stats';
+const EMPTY_STATS: StatsData = { history: [], noGameDays: 0 };
 
 export const loadStats = async (): Promise<StatsData> => {
   const raw = localStorage.getItem(STATS_KEY);
-  if (!raw) return { history: [], noGameDays: 0 };
+  if (!raw) return EMPTY_STATS;
   try {
     return JSON.parse(raw) as StatsData;
   } catch {
-    return { history: [], noGameDays: 0 };
+    return EMPTY_STATS;
   }
 };
 
@@ -43,7 +44,7 @@ export const recordResult = async (name: string, attendees: string[]): Promise<v
 };
 
 export const clearHistory = async (): Promise<void> => {
-  localStorage.setItem(STATS_KEY, JSON.stringify({ history: [], noGameDays: 0 }));
+  localStorage.setItem(STATS_KEY, JSON.stringify(EMPTY_STATS));
 };
 
 export const getTotalWorkDays = (historyLength: number, noGameDays: number): number => {
