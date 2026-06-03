@@ -8,9 +8,8 @@ import { StatsPanel } from './StatsPanel';
 import { WinnerBanner } from './WinnerBanner';
 import { NameSlots } from './NameSlots';
 import { recordResult } from '@/lib/stats';
-import { ref, set, onValue } from 'firebase/database';
-import { database } from '@/lib/firebase';
-import { getRoomRef, getRoomId } from '@/lib/room';
+import { set, onValue } from 'firebase/database';
+import { getRoomRef } from '@/lib/room';
 
 const DEFAULT_NAMES = [
   'Oliver', 'David', 'Alina', 'Camille', 'James', 'Adri', 'Ross', 'Luke', 'Romain'
