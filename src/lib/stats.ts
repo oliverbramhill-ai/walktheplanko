@@ -1,7 +1,10 @@
+import { get, set, push, onValue, off } from 'firebase/database';
+import { getRoomRef } from './room';
+
 export interface GameResult {
   name: string;
   timestamp: string;
-  attendees: string[]; // who was in the pool for this game
+  attendees: string[];
 }
 
 export interface PlayerStats {
@@ -22,29 +25,45 @@ export interface StatsData {
   noGameDays: number;
 }
 
-// --- localStorage-backed API ---
-
-const STATS_KEY = 'plinko-stats';
 const EMPTY_STATS: StatsData = { history: [], noGameDays: 0 };
 
 export const loadStats = async (): Promise<StatsData> => {
-  const raw = localStorage.getItem(STATS_KEY);
-  if (!raw) return EMPTY_STATS;
   try {
-    return JSON.parse(raw) as StatsData;
+    const snapshot = await get(getRoomRef('stats'));
+    if (!snapshot.exists()) return EMPTY_STATS;
+    const data = snapshot.val();
+    // Firebase stores arrays as objects when they have gaps — normalise
+    const rawHistory = data.history ?? {};
+    const history: GameResult[] = Array.isArray(rawHistory)
+      ? rawHistory
+      : Object.values(rawHistory);
+    return { history, noGameDays: data.noGameDays ?? 0 };
   } catch {
     return EMPTY_STATS;
   }
 };
 
 export const recordResult = async (name: string, attendees: string[]): Promise<void> => {
-  const data = await loadStats();
-  data.history.push({ name, timestamp: new Date().toISOString(), attendees });
-  localStorage.setItem(STATS_KEY, JSON.stringify(data));
+  const entry: GameResult = { name, timestamp: new Date().toISOString(), attendees };
+  await push(getRoomRef('stats/history'), entry);
 };
 
 export const clearHistory = async (): Promise<void> => {
-  localStorage.setItem(STATS_KEY, JSON.stringify(EMPTY_STATS));
+  await set(getRoomRef('stats'), EMPTY_STATS);
+};
+
+export const subscribeStats = (callback: (data: StatsData) => void): (() => void) => {
+  const statsRef = getRoomRef('stats');
+  const handler = onValue(statsRef, (snapshot) => {
+    if (!snapshot.exists()) { callback(EMPTY_STATS); return; }
+    const data = snapshot.val();
+    const rawHistory = data.history ?? {};
+    const history: GameResult[] = Array.isArray(rawHistory)
+      ? rawHistory
+      : Object.values(rawHistory);
+    callback({ history, noGameDays: data.noGameDays ?? 0 });
+  });
+  return () => off(statsRef, 'value', handler);
 };
 
 export const getTotalWorkDays = (historyLength: number, noGameDays: number): number => {
@@ -58,8 +77,6 @@ export const getCounts = (history: GameResult[]): Record<string, number> => {
   }
   return counts;
 };
-
-// --- Stats computation ---
 
 const getLuckStatus = (pct: number): { status: string; emoji: string } => {
   if (pct < -70)  return { status: 'BLESSED',           emoji: '😇' };
@@ -80,53 +97,31 @@ const getLuckStatus = (pct: number): { status: string; emoji: string } => {
 
 export const computePlayerStats = (history: GameResult[], noGameDays: number): PlayerStats[] => {
   if (history.length === 0) return [];
-
   const totalWorkDays = getTotalWorkDays(history.length, noGameDays);
-
-  // Collect all unique player names
   const allNames = new Set<string>();
-  history.forEach(r => {
-    allNames.add(r.name);
-    r.attendees.forEach(n => allNames.add(n));
-  });
-
+  history.forEach(r => { allNames.add(r.name); r.attendees.forEach(n => allNames.add(n)); });
   const numPlayers = allNames.size;
-
   return Array.from(allNames).map(name => {
     const walksHistory = history.filter(r => r.name === name);
     const totalWalks = walksHistory.length;
     const daysAttended = history.filter(r => r.attendees.includes(name)).length;
-
     const pctAttended = daysAttended > 0 ? (totalWalks / daysAttended) * 100 : 0;
     const pctWorkDays = totalWorkDays > 0 ? (totalWalks / totalWorkDays) * 100 : 0;
-
-    // Expected = days_attended / num_players  (matches spreadsheet formula)
     const expectedWalks = daysAttended / numPlayers;
-
-    // Luck % = how far above/below expected (%)
-    const luckPct =
-      expectedWalks > 0
-        ? ((totalWalks - expectedWalks) / expectedWalks) * 100
-        : totalWalks === 0 ? -100 : 100;
-
+    const luckPct = expectedWalks > 0
+      ? ((totalWalks - expectedWalks) / expectedWalks) * 100
+      : totalWalks === 0 ? -100 : 100;
     const { status: luckStatus, emoji: luckStatusEmoji } = getLuckStatus(luckPct);
-
-    // Calendar days since last walk
     const lastWalk = walksHistory.length > 0 ? walksHistory[walksHistory.length - 1] : null;
     const daysSinceLastWalk = lastWalk
       ? Math.floor((Date.now() - new Date(lastWalk.timestamp).getTime()) / (1000 * 60 * 60 * 24))
       : -1;
-
     return {
-      name,
-      totalWalks,
-      daysAttended,
+      name, totalWalks, daysAttended,
       pctAttendedWalked: pctAttended.toFixed(1) + '%',
       pctWorkDaysWalked: pctWorkDays.toFixed(1) + '%',
       expectedWalks: Math.round(expectedWalks * 10) / 10,
-      luckStatus,
-      luckStatusEmoji,
-      daysSinceLastWalk,
+      luckStatus, luckStatusEmoji, daysSinceLastWalk,
       luckPct: Math.round(luckPct * 10) / 10,
     };
   });
