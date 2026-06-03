@@ -10,6 +10,7 @@ import { NameSlots } from './NameSlots';
 import { recordResult } from '@/lib/stats';
 import { set, onValue } from 'firebase/database';
 import { getRoomRef } from '@/lib/room';
+import { RoomShare } from './RoomShare';
 
 const DEFAULT_NAMES = [
   'Oliver', 'David', 'Alina', 'Camille', 'James', 'Adri', 'Ross', 'Luke', 'Romain'
@@ -691,9 +692,12 @@ export const PlinkoGame = () => {
   return (
     <div className="flex flex-col lg:flex-row gap-6 items-start justify-center p-4">
       <div className="flex flex-col items-center gap-4">
-        <h1 className="text-4xl md:text-6xl font-pirate text-primary drop-shadow-lg">
-          Walk the Plank-o! ☠️
-        </h1>
+        <div className="flex w-full items-center justify-between">
+          <h1 className="text-4xl md:text-6xl font-pirate text-primary drop-shadow-lg">
+            Walk the Plank-o! ☠️
+          </h1>
+          <RoomShare />
+        </div>
         
         <DropZones 
           dropCounts={dropCounts}
