@@ -1,15 +1,16 @@
-// src/components/RoomShare.tsx
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { getShareUrl, getRoomId } from '@/lib/room';
 
 export const RoomShare = () => {
   const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(getShareUrl()).then(() => {
+      if (timerRef.current) clearTimeout(timerRef.current);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+      timerRef.current = setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
   };
 
   return (
