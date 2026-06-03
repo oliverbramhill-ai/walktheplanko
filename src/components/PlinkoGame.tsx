@@ -8,6 +8,9 @@ import { StatsPanel } from './StatsPanel';
 import { WinnerBanner } from './WinnerBanner';
 import { NameSlots } from './NameSlots';
 import { recordResult } from '@/lib/stats';
+import { ref, set, onValue } from 'firebase/database';
+import { database } from '@/lib/firebase';
+import { getRoomRef, getRoomId } from '@/lib/room';
 
 const DEFAULT_NAMES = [
   'Oliver', 'David', 'Alina', 'Camille', 'James', 'Adri', 'Ross', 'Luke', 'Romain'
@@ -46,17 +49,12 @@ export const PlinkoGame = () => {
   const trailPositionsRef = useRef<{x: number, y: number, alpha: number}[]>([]);
   
   
-  const [names, setNames] = useState<string[]>(() => {
-    try { const v = localStorage.getItem('plinko-names'); return v ? JSON.parse(v) : DEFAULT_NAMES; } catch { return DEFAULT_NAMES; }
-  });
-  const [scores, setScores] = useState<Record<string, number>>(() => {
-    try { const v = localStorage.getItem('plinko-scores'); return v ? JSON.parse(v) : {}; } catch { return {}; }
-  });
+  const [names, setNames] = useState<string[]>(DEFAULT_NAMES);
+  const [scores, setScores] = useState<Record<string, number>>({});
   const dropCounts = useMemo(() => names.map(() => 15), [names]); // Fixed at 15 per zone
   const [isDropping, setIsDropping] = useState(false);
   const [winner, setWinner] = useState<string | null>(null);
   const [showStats, setShowStats] = useState(false);
-  const [statsRefreshKey, setStatsRefreshKey] = useState(0);
   const [activeBalls, setActiveBalls] = useState(0);
   const [isShaking, setIsShaking] = useState(false);
   const [singleBallMode, setSingleBallMode] = useState(() => {
@@ -84,13 +82,42 @@ export const PlinkoGame = () => {
   const hasAnnouncedWinnerRef = useRef(false);
 
   // Persist state to localStorage
-  useEffect(() => { localStorage.setItem('plinko-names', JSON.stringify(names)); }, [names]);
-  useEffect(() => { localStorage.setItem('plinko-scores', JSON.stringify(scores)); }, [scores]);
   useEffect(() => { localStorage.setItem('plinko-singleBallMode', String(singleBallMode)); }, [singleBallMode]);
   useEffect(() => { localStorage.setItem('plinko-luckySailor', luckySailor || ''); }, [luckySailor]);
   useEffect(() => { localStorage.setItem('plinko-luckySailorEnabled', String(luckySailorEnabled)); }, [luckySailorEnabled]);
   useEffect(() => { localStorage.setItem('plinko-unluckySailor', unluckySailor || ''); }, [unluckySailor]);
   useEffect(() => { localStorage.setItem('plinko-unluckySailorEnabled', String(unluckySailorEnabled)); }, [unluckySailorEnabled]);
+
+  // Subscribe to names from Firebase
+  useEffect(() => {
+    const namesRef = getRoomRef('names');
+    const unsubscribe = onValue(namesRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const val = snapshot.val();
+        setNames(Array.isArray(val) ? val : Object.values(val));
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Subscribe to scores from Firebase
+  useEffect(() => {
+    const scoresRef = getRoomRef('scores');
+    const unsubscribe = onValue(scoresRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setScores(snapshot.val() as Record<string, number>);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    set(getRoomRef('names'), names).catch(() => {});
+  }, [names]);
+
+  useEffect(() => {
+    set(getRoomRef('scores'), scores).catch(() => {});
+  }, [scores]);
 
   const getSlotWidths = useCallback(() => {
     const normalWidth = 100 / names.length;
@@ -332,7 +359,7 @@ export const PlinkoGame = () => {
     
     if (winnerName && maxScore > 0) {
       hasAnnouncedWinnerRef.current = true;
-      recordResult(winnerName, names).then(() => setStatsRefreshKey(k => k + 1));
+      recordResult(winnerName, names);
       setWinner(winnerName);
       sounds.playWinner();
       sounds.playArrr();
@@ -765,7 +792,7 @@ export const PlinkoGame = () => {
       
       <div className="flex flex-col gap-4">
         <Scoreboard names={names} scores={scores} />
-        {showStats && <StatsPanel refreshKey={statsRefreshKey} />}
+        {showStats && <StatsPanel />}
         
         <div className="parchment-bg rounded-xl p-4 rope-border">
           <h3 className="font-pirate text-xl text-wood-dark mb-3">⚙️ Game Options</h3>
