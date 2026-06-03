@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { loadStats, clearHistory, computePlayerStats, type GameResult, type PlayerStats } from '@/lib/stats';
+import { subscribeStats, clearHistory, computePlayerStats, type GameResult, type PlayerStats } from '@/lib/stats';
 
 const luckColor = (status: string): string => {
   switch (status) {
@@ -22,21 +22,18 @@ const formatDate = (iso: string) => {
   return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
-interface StatsPanelProps {
-  refreshKey?: number;
-}
-
-export const StatsPanel = ({ refreshKey = 0 }: StatsPanelProps) => {
+export const StatsPanel = () => {
   const [history, setHistory] = useState<GameResult[]>([]);
   const [noGameDays, setNoGameDays] = useState(0);
   const [tab, setTab] = useState<'table' | 'history'>('table');
 
   useEffect(() => {
-    loadStats().then(data => {
+    const unsubscribe = subscribeStats(data => {
       setHistory(data.history);
       setNoGameDays(data.noGameDays);
     });
-  }, [refreshKey]);
+    return unsubscribe;
+  }, []);
 
   const stats: PlayerStats[] = computePlayerStats(history, noGameDays)
     .sort((a, b) => b.totalWalks - a.totalWalks);
