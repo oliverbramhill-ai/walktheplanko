@@ -5,7 +5,7 @@ import { componentTagger } from "lovable-tagger";
 import { statsPlugin } from "./vite-plugin-stats";
 
 export default defineConfig(({ mode }) => ({
-  base: mode === "production" ? "/warlktheplanko/" : "/",
+  base: mode === "production" ? "/walktheplanko/" : "/",
   server: {
     host: "localhost",
     port: 8080,
