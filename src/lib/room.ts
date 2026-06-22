@@ -1,5 +1,4 @@
 // src/lib/room.ts
-import { nanoid } from 'nanoid';
 import { ref, get, set } from 'firebase/database';
 import { database } from './firebase';
 import { ADJECTIVES, NOUNS, OBJECTS } from './wordlist';
@@ -53,12 +52,8 @@ export const getRoomId = (): string => {
     window.history.replaceState({}, '', url.toString());
     return fromStorage;
   }
-  const newId = nanoid(10);
-  localStorage.setItem(ROOM_STORAGE_KEY, newId);
-  const url = new URL(window.location.href);
-  url.searchParams.set('room', newId);
-  window.history.replaceState({}, '', url.toString());
-  return newId;
+  // Should never reach here — hasRoom() gates the app until a room is set via onboarding
+  return '';
 };
 
 export const getRoomRef = (path: string) => {

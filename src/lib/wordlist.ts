@@ -15,8 +15,8 @@ export const NOUNS = [
 
 export const OBJECTS = [
   'atlas', 'beacon', 'brig', 'buccaneer', 'chart', 'chest', 'crow',
-  'cutlass', 'dagger', 'doubloon', 'flint', 'grog', 'helm', 'horizon',
-  'isle', 'knot', 'loot', 'mainsail', 'mizzen', 'parrot', 'pearl',
+  'dagger', 'doubloon', 'flint', 'grog', 'helm', 'horizon', 'isle',
+  'knot', 'loot', 'mainsail', 'mizzen', 'parrot', 'pearl',
   'pistol', 'powder', 'prize', 'rum', 'sextant', 'shackle', 'siren',
-  'spyglass', 'trident',
+  'spyglass', 'trident', 'flintlock',
 ];

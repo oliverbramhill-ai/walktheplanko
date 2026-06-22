@@ -57,6 +57,7 @@ export const OnboardingModal = ({ onComplete }: OnboardingModalProps) => {
   const handleJoinLookup = async () => {
     const code = codeInput.trim().toLowerCase();
     if (!code) { setError('Enter a room code'); return; }
+    if (!/^[a-z0-9-]+$/.test(code)) { setError('Invalid room code — use only letters, numbers, and hyphens'); return; }
     setLoading(true);
     setError('');
     try {
