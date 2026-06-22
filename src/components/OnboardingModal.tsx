@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { generateRoomCode, roomCodeExists, getSquadSetup, saveSquadSetup } from '@/lib/room';
+import { generateRoomCode, roomCodeExists, getSquadSetup, saveSquadSetup, SquadSetup } from '@/lib/room';
 
 type Screen = 'choice' | 'create' | 'join' | 'join_members';
 
@@ -11,18 +11,27 @@ export const OnboardingModal = ({ onComplete }: OnboardingModalProps) => {
   const [screen, setScreen] = useState<Screen>('choice');
   const [squadName, setSquadName] = useState('');
   const [members, setMembers] = useState<string[]>([]);
-  const [nameInput, setNameInput] = useState('');
+  const [createNameInput, setCreateNameInput] = useState('');
+  const [joinNameInput, setJoinNameInput] = useState('');
   const [codeInput, setCodeInput] = useState('');
   const [joinedCode, setJoinedCode] = useState('');
+  const [joinedSetup, setJoinedSetup] = useState<SquadSetup | null>(null);
   const [existingMembers, setExistingMembers] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const addMember = () => {
-    const trimmed = nameInput.trim();
+  const addCreateMember = () => {
+    const trimmed = createNameInput.trim();
     if (!trimmed || members.includes(trimmed)) return;
     setMembers(prev => [...prev, trimmed]);
-    setNameInput('');
+    setCreateNameInput('');
+  };
+
+  const addJoinMember = () => {
+    const trimmed = joinNameInput.trim();
+    if (!trimmed || members.includes(trimmed) || existingMembers.includes(trimmed)) return;
+    setMembers(prev => [...prev, trimmed]);
+    setJoinNameInput('');
   };
 
   const removeMember = (name: string) => {
@@ -55,6 +64,7 @@ export const OnboardingModal = ({ onComplete }: OnboardingModalProps) => {
       if (!exists) { setError('Room not found. Check the code and try again.'); setLoading(false); return; }
       const setup = await getSquadSetup(code);
       setJoinedCode(code);
+      setJoinedSetup(setup);
       setExistingMembers(setup?.members ?? []);
       setMembers([]);
       setScreen('join_members');
@@ -70,12 +80,9 @@ export const OnboardingModal = ({ onComplete }: OnboardingModalProps) => {
     setError('');
     try {
       if (members.length > 0) {
-        const setup = await getSquadSetup(joinedCode);
-        const merged = [...(setup?.members ?? []), ...members];
-        await saveSquadSetup(joinedCode, {
-          squadName: setup?.squadName ?? '',
-          members: merged,
-        });
+        if (!joinedSetup) { setError('Room data lost. Go back and try again.'); return; }
+        const merged = [...joinedSetup.members, ...members];
+        await saveSquadSetup(joinedCode, { squadName: joinedSetup.squadName, members: merged });
       }
       onComplete(joinedCode);
     } catch {
@@ -129,13 +136,13 @@ export const OnboardingModal = ({ onComplete }: OnboardingModalProps) => {
               <div className="flex gap-2">
                 <input
                   type="text"
-                  value={nameInput}
-                  onChange={e => setNameInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addMember()}
+                  value={createNameInput}
+                  onChange={e => setCreateNameInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addCreateMember()}
                   placeholder="Enter a name"
                   className="flex-1 bg-wood-mid/30 border border-gold/30 rounded-lg px-3 py-2 text-parchment placeholder-parchment/30 focus:outline-none focus:border-gold/60"
                 />
-                <button onClick={addMember} className="px-4 py-2 bg-gold/20 hover:bg-gold/30 text-gold rounded-lg border border-gold/30 transition-colors">
+                <button onClick={addCreateMember} className="px-4 py-2 bg-gold/20 hover:bg-gold/30 text-gold rounded-lg border border-gold/30 transition-colors">
                   Add
                 </button>
               </div>
@@ -212,13 +219,13 @@ export const OnboardingModal = ({ onComplete }: OnboardingModalProps) => {
               <div className="flex gap-2">
                 <input
                   type="text"
-                  value={nameInput}
-                  onChange={e => setNameInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addMember()}
+                  value={joinNameInput}
+                  onChange={e => setJoinNameInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addJoinMember()}
                   placeholder="Enter a name"
                   className="flex-1 bg-wood-mid/30 border border-gold/30 rounded-lg px-3 py-2 text-parchment placeholder-parchment/30 focus:outline-none focus:border-gold/60"
                 />
-                <button onClick={addMember} className="px-4 py-2 bg-gold/20 hover:bg-gold/30 text-gold rounded-lg border border-gold/30 transition-colors">
+                <button onClick={addJoinMember} className="px-4 py-2 bg-gold/20 hover:bg-gold/30 text-gold rounded-lg border border-gold/30 transition-colors">
                   Add
                 </button>
               </div>
@@ -234,13 +241,21 @@ export const OnboardingModal = ({ onComplete }: OnboardingModalProps) => {
               )}
             </div>
             {error && <p className="text-red-400 text-sm">{error}</p>}
-            <button
-              onClick={handleJoinSubmit}
-              disabled={loading}
-              className="w-full py-3 bg-gold text-wood-dark font-pirate text-xl rounded-xl hover:bg-gold/90 disabled:opacity-50 transition-colors"
-            >
-              {loading ? 'Boarding...' : 'Board Ship! ⚓'}
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setScreen('join'); setJoinedCode(''); setJoinedSetup(null); setExistingMembers([]); setMembers([]); setJoinNameInput(''); setError(''); }}
+                className="flex-1 py-2 border border-gold/30 text-parchment/60 rounded-xl hover:text-parchment transition-colors"
+              >
+                Back
+              </button>
+              <button
+                onClick={handleJoinSubmit}
+                disabled={loading}
+                className="flex-1 py-3 bg-gold text-wood-dark font-pirate text-xl rounded-xl hover:bg-gold/90 disabled:opacity-50 transition-colors"
+              >
+                {loading ? 'Boarding...' : 'Board Ship! ⚓'}
+              </button>
+            </div>
           </div>
         )}
 
