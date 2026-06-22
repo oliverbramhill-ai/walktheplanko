@@ -27,9 +27,10 @@ export const getSquadSetup = async (code: string): Promise<SquadSetup | null> =>
   const snapshot = await get(setupRef);
   if (!snapshot.exists()) return null;
   const data = snapshot.val();
-  const members: string[] = Array.isArray(data.members)
+  const raw = Array.isArray(data.members)
     ? data.members
     : Object.values(data.members ?? {});
+  const members: string[] = raw.filter((m): m is string => typeof m === 'string');
   return { squadName: data.squadName ?? '', members };
 };
 
