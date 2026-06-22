@@ -77,6 +77,7 @@ export const hasRoom = (): boolean => {
 };
 
 export const setRoom = (code: string): void => {
+  if (!code) return;
   localStorage.setItem(ROOM_STORAGE_KEY, code);
   const url = new URL(window.location.href);
   url.searchParams.set('room', code);

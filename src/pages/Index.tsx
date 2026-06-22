@@ -14,7 +14,7 @@ const Index = () => {
   return (
     <main className="min-h-screen ocean-gradient py-6">
       {!roomReady && <OnboardingModal onComplete={handleOnboardingComplete} />}
-      <PlinkoGame />
+      {roomReady && <PlinkoGame />}
     </main>
   );
 };
