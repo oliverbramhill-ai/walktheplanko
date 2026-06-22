@@ -70,3 +70,15 @@ export const getShareUrl = (): string => {
   url.searchParams.set('room', getRoomId());
   return url.toString();
 };
+
+export const hasRoom = (): boolean => {
+  const params = new URLSearchParams(window.location.search);
+  return !!(params.get('room') || localStorage.getItem(ROOM_STORAGE_KEY));
+};
+
+export const setRoom = (code: string): void => {
+  localStorage.setItem(ROOM_STORAGE_KEY, code);
+  const url = new URL(window.location.href);
+  url.searchParams.set('room', code);
+  window.history.replaceState({}, '', url.toString());
+};
