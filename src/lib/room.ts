@@ -3,6 +3,8 @@ import { ref, get, set } from 'firebase/database';
 import { database } from './firebase';
 import { ADJECTIVES, NOUNS, OBJECTS } from './wordlist';
 
+export const ROSTER_LIMIT = 15;
+
 const ROOM_STORAGE_KEY = 'plinko-roomId';
 
 const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
