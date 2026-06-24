@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { onValue } from 'firebase/database';
 import { getRoomRef } from '@/lib/room';
 import { subscribeStats, computePlayerStats, type PlayerStats } from '@/lib/stats';
@@ -35,6 +35,7 @@ export const CrewPanel = ({
   const [unluckySailor, setUnluckySailorState] = useState<string | null>(readLS(LS_UNLUCKY));
   const [statsMap, setStatsMap] = useState<Record<string, PlayerStats>>({});
   const [showRosterModal, setShowRosterModal] = useState(false);
+  const prevRosterRef = useRef<string[]>([]);
 
   // Helpers that keep localStorage + callback in sync
   const setLucky = (name: string | null) => {
@@ -62,10 +63,13 @@ export const CrewPanel = ({
         // Keep existing presence for members still in roster; new members start present
         const next = new Set<string>();
         members.forEach(m => {
-          if (prev.has(m) || !prev.size) next.add(m);
+          // Present if was already present, initial load, or is a brand-new roster member
+          if (prev.has(m) || !prev.size || !prevRosterRef.current.includes(m)) next.add(m);
         });
         return next;
       });
+      // Update ref to current roster after computing presence
+      prevRosterRef.current = members;
     });
     return unsub;
   }, []);
