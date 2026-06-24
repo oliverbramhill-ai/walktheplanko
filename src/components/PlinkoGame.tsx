@@ -11,10 +11,7 @@ import { recordResult } from '@/lib/stats';
 import { set, onValue } from 'firebase/database';
 import { getRoomRef } from '@/lib/room';
 import { RoomShare } from './RoomShare';
-
-const DEFAULT_NAMES = [
-  'Oliver', 'David', 'Alina', 'Camille', 'James', 'Adri', 'Ross', 'Luke', 'Romain'
-];
+import { CrewPanel } from './CrewPanel';
 
 const BOARD_WIDTH = 700;
 const BOARD_HEIGHT = 600;
@@ -49,7 +46,7 @@ export const PlinkoGame = () => {
   const trailPositionsRef = useRef<{x: number, y: number, alpha: number}[]>([]);
   
   
-  const [names, setNames] = useState<string[]>(DEFAULT_NAMES);
+  const [names, setNames] = useState<string[]>([]);
   const [scores, setScores] = useState<Record<string, number>>({});
   const dropCounts = useMemo(() => names.map(() => 15), [names]); // Fixed at 15 per zone
   const [isDropping, setIsDropping] = useState(false);
@@ -61,18 +58,10 @@ export const PlinkoGame = () => {
     try { return localStorage.getItem('plinko-singleBallMode') === 'true'; } catch { return false; }
   });
   
-  const [luckySailor, setLuckySailor] = useState<string | null>(() => {
-    try { return localStorage.getItem('plinko-luckySailor') || null; } catch { return null; }
-  });
-  const [luckySailorEnabled, setLuckySailorEnabled] = useState(() => {
-    try { return localStorage.getItem('plinko-luckySailorEnabled') === 'true'; } catch { return false; }
-  });
-  const [unluckySailor, setUnluckySailor] = useState<string | null>(() => {
-    try { return localStorage.getItem('plinko-unluckySailor') || null; } catch { return null; }
-  });
-  const [unluckySailorEnabled, setUnluckySailorEnabled] = useState(() => {
-    try { return localStorage.getItem('plinko-unluckySailorEnabled') === 'true'; } catch { return false; }
-  });
+  const [luckySailor, setLuckySailor] = useState<string | null>(null);
+  const [unluckySailor, setUnluckySailor] = useState<string | null>(null);
+  const luckySailorEnabled = luckySailor !== null;
+  const unluckySailorEnabled = unluckySailor !== null;
   
   const sounds = usePlinkoSounds();
   const ballCountRef = useRef(0);
@@ -83,22 +72,6 @@ export const PlinkoGame = () => {
 
   // Persist state to localStorage
   useEffect(() => { localStorage.setItem('plinko-singleBallMode', String(singleBallMode)); }, [singleBallMode]);
-  useEffect(() => { localStorage.setItem('plinko-luckySailor', luckySailor || ''); }, [luckySailor]);
-  useEffect(() => { localStorage.setItem('plinko-luckySailorEnabled', String(luckySailorEnabled)); }, [luckySailorEnabled]);
-  useEffect(() => { localStorage.setItem('plinko-unluckySailor', unluckySailor || ''); }, [unluckySailor]);
-  useEffect(() => { localStorage.setItem('plinko-unluckySailorEnabled', String(unluckySailorEnabled)); }, [unluckySailorEnabled]);
-
-  // Subscribe to names from Firebase
-  useEffect(() => {
-    const namesRef = getRoomRef('names');
-    const unsubscribe = onValue(namesRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const val = snapshot.val();
-        setNames(Array.isArray(val) ? val : Object.values(val));
-      }
-    });
-    return () => unsubscribe();
-  }, []);
 
   // Subscribe to scores from Firebase
   useEffect(() => {
@@ -110,10 +83,6 @@ export const PlinkoGame = () => {
     });
     return () => unsubscribe();
   }, []);
-
-  useEffect(() => {
-    set(getRoomRef('names'), names).catch(() => {});
-  }, [names]);
 
   useEffect(() => {
     set(getRoomRef('scores'), scores).catch(() => {});
@@ -154,7 +123,7 @@ export const PlinkoGame = () => {
       }
       return normalWidth + otherAdjustment;
     });
-  }, [names, luckySailor, luckySailorEnabled, unluckySailor, unluckySailorEnabled]);
+  }, [names, luckySailor, unluckySailor]);
 
   const initializeScores = useCallback(() => {
     const initialScores: Record<string, number> = {};
@@ -539,7 +508,7 @@ export const PlinkoGame = () => {
       Matter.Runner.stop(runner);
       Matter.Engine.clear(engine);
     };
-  }, [names, luckySailor, luckySailorEnabled, unluckySailor, unluckySailorEnabled]);
+  }, [names, luckySailor, unluckySailor]);
 
   const dropBall = (x: number, isSingleBall: boolean = false) => {
     if (!engineRef.current) return;
@@ -670,25 +639,6 @@ export const PlinkoGame = () => {
     initializeScores();
   };
 
-  const addName = () => {
-    if (names.length >= 10) return;
-    const newNames = [...names, `Crew ${names.length + 1}`];
-    setNames(newNames);
-  };
-
-  const removeName = (index: number) => {
-    if (names.length <= 2) return;
-    const removedName = names[index];
-    const newNames = names.filter((_, i) => i !== index);
-    setNames(newNames);
-    if (luckySailor === removedName) {
-      setLuckySailor(null);
-    }
-    if (unluckySailor === removedName) {
-      setUnluckySailor(null);
-    }
-  };
-
   return (
     <div className="flex flex-col lg:flex-row gap-6 items-start justify-center p-4">
       <div className="flex flex-col items-center gap-4">
@@ -765,35 +715,16 @@ export const PlinkoGame = () => {
           <p className="text-lg font-pirate text-gold">
             ⚫ Balls in play: {activeBalls}
           </p>
-            )}
-            
-            <label className="flex items-center gap-2 cursor-pointer mt-2">
-              <input
-                type="checkbox"
-                checked={unluckySailorEnabled}
-                onChange={(e) => setUnluckySailorEnabled(e.target.checked)}
-                disabled={isDropping}
-                className="w-4 h-4"
-              />
-              <span className="text-wood-dark font-semibold">💀 Unlucky Sailor Mode</span>
-            </label>
-            
-            {unluckySailorEnabled && (
-              <select
-                value={unluckySailor || ''}
-                onChange={(e) => setUnluckySailor(e.target.value || null)}
-                disabled={isDropping}
-                className="px-2 py-1 rounded bg-wood-dark text-parchment text-sm border border-rope"
-              >
-                <option value="">Select Unlucky Sailor...</option>
-                {names.map((name) => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
-            )}
-          </div>
-      
+        )}
+      </div>
+
       <div className="flex flex-col gap-4">
+        <CrewPanel
+          onNamesChange={setNames}
+          onLuckyChange={setLuckySailor}
+          onUnluckyChange={setUnluckySailor}
+          isDropping={isDropping}
+        />
         <Scoreboard names={names} scores={scores} />
         {showStats && <StatsPanel />}
         
@@ -812,82 +743,6 @@ export const PlinkoGame = () => {
               <span className="text-wood-dark font-semibold">🎱 Single Ball Mode</span>
             </label>
             
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={luckySailorEnabled}
-                onChange={(e) => setLuckySailorEnabled(e.target.checked)}
-                disabled={isDropping}
-                className="w-4 h-4"
-              />
-              <span className="text-wood-dark font-semibold">🍀 Lucky Sailor Mode</span>
-            </label>
-            
-            {luckySailorEnabled && (
-              <select
-                value={luckySailor || ''}
-                onChange={(e) => setLuckySailor(e.target.value || null)}
-                disabled={isDropping}
-                className="px-2 py-1 rounded bg-wood-dark text-parchment text-sm border border-rope"
-              >
-                <option value="">Select Lucky Sailor...</option>
-                {names.map((name) => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
-            )}
-          </div>
-        </div>
-        
-        <div className="parchment-bg rounded-xl p-4 rope-border">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-pirate text-xl text-wood-dark">Edit Crew Names</h3>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  const shuffled = [...names].sort(() => Math.random() - 0.5);
-                  setNames(shuffled);
-                }}
-                disabled={isDropping}
-                className="text-sm px-3 py-1 rounded bg-wood-dark text-parchment font-pirate hover:bg-wood-mid transition-colors disabled:opacity-50"
-              >
-                🔀 Shuffle
-              </button>
-              <button
-                onClick={addName}
-                disabled={isDropping || names.length >= 10}
-                className="text-sm px-3 py-1 rounded bg-green-700 text-parchment font-pirate hover:bg-green-600 transition-colors disabled:opacity-50"
-              >
-                + Add
-              </button>
-            </div>
-          </div>
-          <p className="text-xs text-wood-mid mb-2">({names.length}/10 crew members)</p>
-          <div className="grid grid-cols-3 gap-2">
-            {names.map((name, index) => (
-              <div key={index} className="flex gap-1">
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => {
-                    const newNames = [...names];
-                    newNames[index] = e.target.value;
-                    setNames(newNames);
-                  }}
-                  className="flex-1 px-2 py-1 rounded bg-wood-dark text-parchment text-sm border border-rope focus:outline-none focus:ring-2 focus:ring-gold"
-                  disabled={isDropping}
-                />
-                {names.length > 2 && (
-                  <button
-                    onClick={() => removeName(index)}
-                    disabled={isDropping}
-                    className="px-2 py-1 rounded bg-red-700 text-parchment text-xs hover:bg-red-600 disabled:opacity-50"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
           </div>
         </div>
       </div>
