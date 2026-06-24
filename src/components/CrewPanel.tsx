@@ -72,6 +72,8 @@ export const CrewPanel = ({
         : Object.values(val ?? {});
       const members = arr.filter((m): m is string => typeof m === 'string');
       setRoster(members);
+      if (luckySailor && !members.includes(luckySailor)) setLucky(null);
+      if (unluckySailor && !members.includes(unluckySailor)) setUnlucky(null);
       setPresent(prev => {
         // Keep existing presence for members still in roster; new members start present
         const next = new Set<string>();
