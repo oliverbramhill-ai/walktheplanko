@@ -85,6 +85,7 @@ export const PlinkoGame = () => {
   }, []);
 
   useEffect(() => {
+    if (Object.keys(scores).length === 0) return;
     set(getRoomRef('scores'), scores).catch(() => {});
   }, [scores]);
 
@@ -126,6 +127,7 @@ export const PlinkoGame = () => {
   }, [names, luckySailor, unluckySailor]);
 
   const initializeScores = useCallback(() => {
+    if (names.length === 0) return;
     const initialScores: Record<string, number> = {};
     names.forEach(name => {
       initialScores[name] = 0;
