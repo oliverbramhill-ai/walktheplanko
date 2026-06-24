@@ -28,6 +28,7 @@ export const RosterModal = ({ onClose, onSaved }: RosterModalProps) => {
     const updated = [...members];
     updated[index] = value;
     setMembers(updated);
+    setError('');
   };
 
   const handleRemove = (index: number) => {
@@ -83,7 +84,7 @@ export const RosterModal = ({ onClose, onSaved }: RosterModalProps) => {
 
         <div className="flex-1 overflow-y-auto space-y-2 mb-4 pr-1">
           {members.map((name, i) => (
-            <div key={i} className="flex gap-2 items-center">
+            <div key={name} className="flex gap-2 items-center">
               <input
                 type="text"
                 value={name}
