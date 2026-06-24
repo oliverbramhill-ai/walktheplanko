@@ -11,7 +11,7 @@ export interface CrewCardProps {
   onTogglePresent: () => void;
   onToggleLucky: () => void;
   onToggleUnlucky: () => void;
-  disabled: boolean;
+  disabled?: boolean;
 }
 
 export const CrewCard: FC<CrewCardProps> = ({
@@ -25,17 +25,15 @@ export const CrewCard: FC<CrewCardProps> = ({
   onTogglePresent,
   onToggleLucky,
   onToggleUnlucky,
-  disabled,
+  disabled = false,
 }) => {
   const handleLucky = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!present || disabled) return;
     onToggleLucky();
   };
 
   const handleUnlucky = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!present || disabled) return;
     onToggleUnlucky();
   };
 
@@ -62,23 +60,23 @@ export const CrewCard: FC<CrewCardProps> = ({
       <div className="flex justify-center gap-2 mb-2">
         <button
           onClick={handleLucky}
+          disabled={!present || disabled}
           className={`text-2xl rounded-lg px-2 py-1 transition-all border-2 leading-none ${
             isLucky
               ? 'bg-gold/25 border-gold/80'
               : 'bg-transparent border-white/15 opacity-35'
-          } ${!present || disabled ? 'pointer-events-none' : ''}`}
-          tabIndex={-1}
+          }`}
         >
           🍀
         </button>
         <button
           onClick={handleUnlucky}
+          disabled={!present || disabled}
           className={`text-2xl rounded-lg px-2 py-1 transition-all border-2 leading-none ${
             isUnlucky
               ? 'bg-red-800/25 border-red-500/70'
               : 'bg-transparent border-white/15 opacity-35'
-          } ${!present || disabled ? 'pointer-events-none' : ''}`}
-          tabIndex={-1}
+          }`}
         >
           💀
         </button>
