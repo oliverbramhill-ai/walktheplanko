@@ -23,6 +23,19 @@ const writeLS = (key: string, value: string | null) => {
   try { localStorage.setItem(key, value ?? ''); } catch { /* ignore */ }
 };
 
+const DEFAULT_STATS: PlayerStats = {
+  name: '',
+  totalWalks: 0,
+  daysAttended: 0,
+  pctAttendedWalked: '0%',
+  pctWorkDaysWalked: '0%',
+  expectedWalks: 0,
+  daysSinceLastWalk: -1,
+  luckStatus: 'Expected',
+  luckStatusEmoji: '⚖️',
+  luckPct: 0,
+};
+
 export const CrewPanel = ({
   onNamesChange,
   onLuckyChange,
@@ -89,13 +102,13 @@ export const CrewPanel = ({
   useEffect(() => {
     const activeNames = roster.filter(m => present.has(m));
     onNamesChange(activeNames);
-  }, [present, roster]);
+  }, [present, roster, onNamesChange]);
 
-  // Notify parent of initial lucky/unlucky on mount
+  // Sync initial localStorage values to parent once on mount — intentionally fire-once
   useEffect(() => {
     onLuckyChange(luckySailor);
     onUnluckyChange(unluckySailor);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const togglePresent = (name: string) => {
     setPresent(prev => {
@@ -123,19 +136,6 @@ export const CrewPanel = ({
   const handleRosterSaved = (_members: string[]) => {
     // Firebase subscription will update roster state; just close modal
     setShowRosterModal(false);
-  };
-
-  const DEFAULT_STATS: PlayerStats = {
-    name: '',
-    totalWalks: 0,
-    daysAttended: 0,
-    pctAttendedWalked: '0%',
-    pctWorkDaysWalked: '0%',
-    expectedWalks: 0,
-    daysSinceLastWalk: -1,
-    luckStatus: 'Expected',
-    luckStatusEmoji: '⚖️',
-    luckPct: 0,
   };
 
   return (
