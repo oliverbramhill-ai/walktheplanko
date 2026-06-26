@@ -51,7 +51,7 @@ export const CrewCard: FC<CrewCardProps> = ({
     >
       <div
         className={`text-sm font-bold text-center mb-2 ${
-          present ? 'text-parchment' : 'text-parchment/50 line-through'
+          present ? 'text-wood-dark' : 'text-wood-dark/50 line-through'
         }`}
       >
         {name}
@@ -64,7 +64,7 @@ export const CrewCard: FC<CrewCardProps> = ({
           className={`text-2xl rounded-lg px-2 py-1 transition-all border-2 leading-none ${
             isLucky
               ? 'bg-gold/25 border-gold/80'
-              : 'bg-transparent border-white/15 opacity-35'
+              : 'bg-transparent border-wood-dark/20'
           }`}
         >
           🍀
@@ -75,14 +75,14 @@ export const CrewCard: FC<CrewCardProps> = ({
           className={`text-2xl rounded-lg px-2 py-1 transition-all border-2 leading-none ${
             isUnlucky
               ? 'bg-red-800/25 border-red-500/70'
-              : 'bg-transparent border-white/15 opacity-35'
+              : 'bg-transparent border-wood-dark/20'
           }`}
         >
           💀
         </button>
       </div>
 
-      <div className="text-center text-[11px] text-parchment/55">
+      <div className="text-center text-[11px] text-wood-dark/70">
         {totalWalks} walk{totalWalks !== 1 ? 's' : ''} · {luckStatusEmoji} {luckStatus}
       </div>
     </div>
