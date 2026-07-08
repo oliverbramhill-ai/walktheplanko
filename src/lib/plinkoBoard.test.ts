@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeSlotWidths, getSlotBounds, BOARD_WIDTH } from './plinkoBoard';
+import { computeSlotWidths, getSlotBounds, BOARD_WIDTH, BOARD_HEIGHT, createBoardBodies } from './plinkoBoard';
 
 const names = ['Anne', 'Blackbeard', 'Calico', 'Drake'];
 
@@ -36,5 +36,40 @@ describe('getSlotBounds', () => {
     for (let i = 1; i < bounds.length; i++) {
       expect(bounds[i].start).toBeCloseTo(bounds[i - 1].end, 6);
     }
+  });
+});
+
+describe('createBoardBodies', () => {
+  const widths = computeSlotWidths(names, null, null);
+  const bodies = createBoardBodies(widths);
+
+  it('creates one sensor per slot, centered inside each slot', () => {
+    const sensors = bodies.filter((b) => b.label.startsWith('slot-sensor-'));
+    expect(sensors).toHaveLength(names.length);
+    const bounds = getSlotBounds(widths);
+    sensors.forEach((sensor, i) => {
+      expect(sensor.label).toBe(`slot-sensor-${i}`);
+      expect(sensor.isSensor).toBe(true);
+      expect(sensor.isStatic).toBe(true);
+      expect(sensor.position.x).toBeCloseTo(bounds[i].center, 6);
+      expect(sensor.position.y).toBeGreaterThan(BOARD_HEIGHT - 80);
+    });
+  });
+
+  it('extends side walls at least 200px above the canvas', () => {
+    const sideWalls = bodies.filter((b) => b.label === 'side-wall');
+    expect(sideWalls).toHaveLength(2);
+    sideWalls.forEach((wall) => {
+      expect(wall.bounds.min.y).toBeLessThanOrEqual(-200);
+      expect(wall.bounds.max.y).toBeGreaterThanOrEqual(BOARD_HEIGHT);
+    });
+  });
+
+  it('creates super-bouncy pegs and an initially-inactive top boundary', () => {
+    const pegs = bodies.filter((b) => b.label === 'peg');
+    expect(pegs.length).toBeGreaterThan(100);
+    pegs.forEach((peg) => expect(peg.restitution).toBe(1.5));
+    const top = bodies.find((b) => b.label === 'top-boundary');
+    expect(top?.collisionFilter.mask).toBe(0x0000);
   });
 });
