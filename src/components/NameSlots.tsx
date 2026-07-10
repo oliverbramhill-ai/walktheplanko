@@ -1,12 +1,11 @@
 interface NameSlotsProps {
   names: string[];
-  scores: Record<string, number>;
   slotWidths: number[];
   luckySailor?: string | null;
   unluckySailor?: string | null;
 }
 
-export const NameSlots = ({ names, scores, slotWidths, luckySailor, unluckySailor }: NameSlotsProps) => {
+export const NameSlots = ({ names, slotWidths, luckySailor, unluckySailor }: NameSlotsProps) => {
   return (
     <div className="flex absolute bottom-0 left-2 right-2">
       {names.map((name, index) => {
@@ -29,10 +28,7 @@ export const NameSlots = ({ names, scores, slotWidths, luckySailor, unluckySailo
             {isUnlucky && (
               <div className="text-xs text-red-400 animate-pulse mb-0.5">💀</div>
             )}
-            <div className="text-gold font-bold text-lg drop-shadow-md">
-              {scores[name] || 0}
-            </div>
-            <div 
+            <div
               className="text-parchment text-xs font-semibold truncate w-full text-center px-1 drop-shadow-md"
               title={name}
             >

@@ -1,504 +1,171 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Matter from 'matter-js';
 import confetti from 'canvas-confetti';
 import { usePlinkoSounds } from '@/hooks/usePlinkoSounds';
-import { DropZones } from './DropZones';
-import { Scoreboard } from './Scoreboard';
 import { StatsPanel } from './StatsPanel';
 import { WinnerBanner } from './WinnerBanner';
 import { NameSlots } from './NameSlots';
 import { recordResult } from '@/lib/stats';
-import { set, onValue } from 'firebase/database';
-import { getRoomRef } from '@/lib/room';
 import { RoomShare } from './RoomShare';
 import { CrewPanel } from './CrewPanel';
-
-const BOARD_WIDTH = 700;
-const BOARD_HEIGHT = 600;
-const PEG_RADIUS = 6;
-const BALL_RADIUS = 7; // Reduced by 30% from 10
-
-// Grid configuration - reduced margin for edge coverage
-const GRID_MARGIN = BOARD_WIDTH * 0.02; // 2% margin on each side
-const GRID_WIDTH = BOARD_WIDTH - (GRID_MARGIN * 2);
-const PEG_COLS = 13; // More columns for denser coverage
-const PEG_SPACING = GRID_WIDTH / (PEG_COLS - 1);
-const PEG_ROWS = 12;
-
-// Helper to get slot center positions from slot widths
-const getSlotCenters = (slotWidths: number[], boardWidth: number): number[] => {
-  let acc = 0;
-  return slotWidths.map((percentageWidth) => {
-    const widthPx = (percentageWidth / 100) * boardWidth;
-    const center = acc + widthPx / 2;
-    acc += widthPx;
-    return center;
-  });
-};
+import {
+  BOARD_WIDTH, BOARD_HEIGHT, BALL_RADIUS,
+  computeSlotWidths, createBoardBodies,
+} from '@/lib/plinkoBoard';
 
 export const PlinkoGame = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const trailCanvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<Matter.Engine | null>(null);
-  const renderRef = useRef<Matter.Render | null>(null);
-  const runnerRef = useRef<Matter.Runner | null>(null);
-  const pegsRef = useRef<Matter.Body[]>([]);
-  const trailPositionsRef = useRef<{x: number, y: number, alpha: number}[]>([]);
-  
-  
+  const trailPositionsRef = useRef<{ x: number; y: number }[]>([]);
+  const namesRef = useRef<string[]>([]);
+  const chosenRef = useRef(false);
+
   const [names, setNames] = useState<string[]>([]);
-  const [scores, setScores] = useState<Record<string, number>>({});
-  const dropCounts = useMemo(() => names.map(() => 15), [names]); // Fixed at 15 per zone
   const [isDropping, setIsDropping] = useState(false);
   const [winner, setWinner] = useState<string | null>(null);
   const [showStats, setShowStats] = useState(false);
-  const [activeBalls, setActiveBalls] = useState(0);
   const [isShaking, setIsShaking] = useState(false);
-  const [singleBallMode, setSingleBallMode] = useState(() => {
-    try { return localStorage.getItem('plinko-singleBallMode') === 'true'; } catch { return false; }
-  });
-  
+
   const [luckySailor, setLuckySailor] = useState<string | null>(null);
   const [unluckySailor, setUnluckySailor] = useState<string | null>(null);
-  const luckySailorEnabled = luckySailor !== null;
-  const unluckySailorEnabled = unluckySailor !== null;
-  
+
   const sounds = usePlinkoSounds();
-  const ballCountRef = useRef(0);
-  const landedBallsRef = useRef(0);
-  const totalBallsToDropRef = useRef(0);
-  const scoresRef = useRef<Record<string, number>>({});
-  const hasAnnouncedWinnerRef = useRef(false);
+  namesRef.current = names;
 
-  // Persist state to localStorage
-  useEffect(() => { localStorage.setItem('plinko-singleBallMode', String(singleBallMode)); }, [singleBallMode]);
+  const slotWidths = computeSlotWidths(names, luckySailor, unluckySailor);
 
-  // Subscribe to scores from Firebase
-  useEffect(() => {
-    const scoresRef = getRoomRef('scores');
-    const unsubscribe = onValue(scoresRef, (snapshot) => {
-      if (snapshot.exists()) {
-        setScores(snapshot.val() as Record<string, number>);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
+  const celebrate = (name: string) => {
+    recordResult(name, namesRef.current);
+    setWinner(name);
+    sounds.playWinner();
+    sounds.playArrr();
 
-  useEffect(() => {
-    if (Object.keys(scores).length === 0) return;
-    set(getRoomRef('scores'), scores).catch(() => {});
-  }, [scores]);
-
-  const getSlotWidths = useCallback(() => {
-    const normalWidth = 100 / names.length;
-    
-    const hasLucky = luckySailorEnabled && luckySailor && names.includes(luckySailor);
-    const hasUnlucky = unluckySailorEnabled && unluckySailor && names.includes(unluckySailor);
-    
-    if (!hasLucky && !hasUnlucky) {
-      return names.map(() => normalWidth);
-    }
-    
-    // Calculate adjustments
-    let luckyAdjustment = 0;
-    let unluckyAdjustment = 0;
-    
-    if (hasLucky) {
-      luckyAdjustment = normalWidth * 0.15; // Lucky loses 15% of their width
-    }
-    if (hasUnlucky) {
-      unluckyAdjustment = normalWidth / 2; // Unlucky gains half more width
-    }
-    
-    // Net adjustment to distribute among others
-    const netAdjustment = luckyAdjustment - unluckyAdjustment;
-    const othersCount = names.length - (hasLucky ? 1 : 0) - (hasUnlucky ? 1 : 0);
-    const otherAdjustment = othersCount > 0 ? netAdjustment / othersCount : 0;
-    
-    return names.map((name) => {
-      if (hasLucky && name === luckySailor) {
-        return normalWidth * 0.85; // 15% smaller
-      }
-      if (hasUnlucky && name === unluckySailor) {
-        return normalWidth * 1.5; // 50% larger
-      }
-      return normalWidth + otherAdjustment;
-    });
-  }, [names, luckySailor, unluckySailor]);
-
-  const initializeScores = useCallback(() => {
-    if (names.length === 0) return;
-    const initialScores: Record<string, number> = {};
-    names.forEach(name => {
-      initialScores[name] = 0;
-    });
-    setScores(initialScores);
-    scoresRef.current = initialScores;
-    landedBallsRef.current = 0;
-  }, [names]);
-
-  useEffect(() => {
-    initializeScores();
-  }, [initializeScores]);
-
-  const createPegs = (world: Matter.World) => {
-    const pegs: Matter.Body[] = [];
-    const startY = 90; // Moved down to give balls room to escape at top
-    const rowSpacing = (BOARD_HEIGHT - 150) / PEG_ROWS;
-    
-    for (let row = 0; row < PEG_ROWS; row++) {
-      const isOffsetRow = row % 2 === 1;
-      const cols = isOffsetRow ? PEG_COLS - 1 : PEG_COLS;
-      const rowOffset = isOffsetRow ? PEG_SPACING / 2 : 0;
-      
-      for (let col = 0; col < cols; col++) {
-        const x = GRID_MARGIN + rowOffset + col * PEG_SPACING;
-        const y = startY + row * rowSpacing;
-        
-        const peg = Matter.Bodies.circle(x, y, PEG_RADIUS, {
-          isStatic: true,
-          restitution: 0.8,
-          friction: 0.05,
-          render: {
-            fillStyle: '#C4A45F',
-          },
-          label: 'peg',
-        });
-        pegs.push(peg);
-      }
-    }
-    
-    Matter.Composite.add(world, pegs);
-    pegsRef.current = pegs;
-    return pegs;
+    const end = Date.now() + 3000;
+    const frame = () => {
+      confetti({
+        particleCount: 5, angle: 60, spread: 55, origin: { x: 0, y: 0.7 },
+        colors: ['#FFD700', '#DAA520', '#8B4513', '#CD853F', '#DEB887'],
+      });
+      confetti({
+        particleCount: 5, angle: 120, spread: 55, origin: { x: 1, y: 0.7 },
+        colors: ['#FFD700', '#DAA520', '#8B4513', '#CD853F', '#DEB887'],
+      });
+      if (Date.now() < end) requestAnimationFrame(frame);
+    };
+    frame();
   };
 
+  useEffect(() => {
+    if (!canvasRef.current || names.length === 0) return;
 
-  // Calculate drop zone positions aligned to slot centers
-  const getDropPositions = useCallback(() => {
-    const slotWidths = getSlotWidths();
-    return getSlotCenters(slotWidths, BOARD_WIDTH);
-  }, [getSlotWidths]);
-  const createSlotWalls = (world: Matter.World) => {
-    const walls: Matter.Body[] = [];
-    const slotTop = BOARD_HEIGHT - 80;
-    const slotWidths = getSlotWidths();
-    
-    // LEFT & RIGHT STRAIGHT WALLS ONLY
-    walls.push(
-      Matter.Bodies.rectangle(-10, BOARD_HEIGHT / 2, 20, BOARD_HEIGHT, {
-        isStatic: true,
-        render: { fillStyle: '#5a3921' },
-      }),
-      Matter.Bodies.rectangle(BOARD_WIDTH + 10, BOARD_HEIGHT / 2, 20, BOARD_HEIGHT, {
-        isStatic: true,
-        render: { fillStyle: '#5a3921' },
-      })
-    );
-    
-    // INVISIBLE TOP BOUNDARY - dampens bounce and sends ball back down
-    // Starts with collisions disabled, activated after ball hits first peg
-    const topBoundary = Matter.Bodies.rectangle(BOARD_WIDTH / 2, -60, BOARD_WIDTH + 40, 30, {
-      isStatic: true,
-      restitution: 0.3, // Low restitution to dampen bounce
-      render: { visible: false },
-      label: 'top-boundary',
-      collisionFilter: {
-        category: 0x0002,
-        mask: 0x0000, // Initially doesn't collide with anything
+    const engine = Matter.Engine.create({ gravity: { x: 0, y: 0.8 } });
+    const render = Matter.Render.create({
+      canvas: canvasRef.current,
+      engine,
+      options: {
+        width: BOARD_WIDTH, height: BOARD_HEIGHT,
+        wireframes: false, background: 'transparent',
       },
     });
-    walls.push(topBoundary);
-    
-    let currentX = 0;
-    for (let i = 0; i <= names.length; i++) {
-      const x = i === 0 ? 0 : currentX;
-      const wall = Matter.Bodies.rectangle(x, slotTop + 40, 6, 80, {
-        isStatic: true,
-        render: { fillStyle: '#5a3921' },
-      });
-      walls.push(wall);
-      
-      if (i < names.length) {
-        currentX += (slotWidths[i] / 100) * BOARD_WIDTH;
-      }
-    }
-    
-    walls.push(
-      Matter.Bodies.rectangle(BOARD_WIDTH / 2, BOARD_HEIGHT + 10, BOARD_WIDTH, 20, {
-        isStatic: true,
-        render: { fillStyle: '#5a3921' },
-        label: 'bottom',
-      })
-    );
-    
-    Matter.Composite.add(world, walls);
-    return walls;
-  };
+    const runner = Matter.Runner.create();
 
-  const setupCollisionDetection = (engine: Matter.Engine) => {
+    const bodies = createBoardBodies(
+      computeSlotWidths(names, luckySailor, unluckySailor),
+    );
+    Matter.Composite.add(engine.world, bodies);
+    const topBoundary = bodies.find((b) => b.label === 'top-boundary')!;
+
     Matter.Events.on(engine, 'collisionStart', (event) => {
       event.pairs.forEach((pair) => {
         const labels = [pair.bodyA.label, pair.bodyB.label];
-        
+        const ball = pair.bodyA.label === 'ball' ? pair.bodyA : pair.bodyB;
+
         if (labels.includes('ball') && labels.includes('peg')) {
           sounds.playBounce();
-          const ball = pair.bodyA.label === 'ball' ? pair.bodyA : pair.bodyB;
           Matter.Body.setAngularVelocity(ball, (Math.random() - 0.5) * 0.3);
-          
-          // Mark ball as having hit a peg and activate top boundary for it
-          (ball as any).hasHitPeg = true;
-          
-          // Find and activate the top boundary
-          const bodies = Matter.Composite.allBodies(engine.world);
-          const topBoundary = bodies.find(b => b.label === 'top-boundary');
-          if (topBoundary) {
-            topBoundary.collisionFilter.mask = 0xFFFF; // Now collides with everything
-          }
+          topBoundary.collisionFilter.mask = 0xffff;
         }
-        
-        if (labels.includes('ball') && labels.includes('bottom')) {
-          const ball = pair.bodyA.label === 'ball' ? pair.bodyA : pair.bodyB;
-          const landedBall = ball as any;
-          
-          // Ignore repeated bottom hits from the same ball
-          if (landedBall.hasLanded) {
-            return;
-          }
-          landedBall.hasLanded = true;
-          
-          const slotWidths = getSlotWidths();
-          let accumulatedWidth = 0;
-          let slotIndex = 0;
-          
-          for (let i = 0; i < names.length; i++) {
-            const slotPixelWidth = (slotWidths[i] / 100) * BOARD_WIDTH;
-            if (ball.position.x < accumulatedWidth + slotPixelWidth) {
-              slotIndex = i;
-              break;
-            }
-            accumulatedWidth += slotPixelWidth;
-            if (i === names.length - 1) slotIndex = i;
-          }
-          
-          const name = names[slotIndex];
-          
-          if (name) {
-            scoresRef.current = {
-              ...scoresRef.current,
-              [name]: (scoresRef.current[name] || 0) + 1,
-            };
-            setScores({ ...scoresRef.current });
-            sounds.playSlotLand();
-          }
-          
+
+        const sensor = [pair.bodyA, pair.bodyB].find((b) =>
+          b.label.startsWith('slot-sensor-'),
+        );
+        if (sensor && labels.includes('ball') && !chosenRef.current) {
+          chosenRef.current = true;
+          const slotIndex = Number(sensor.label.replace('slot-sensor-', ''));
+          const name = namesRef.current[slotIndex];
+          sounds.playSlotLand();
+          if (name) celebrate(name);
+
           setTimeout(() => {
             Matter.Composite.remove(engine.world, ball);
-            ballCountRef.current--;
-            landedBallsRef.current++;
-            setActiveBalls(ballCountRef.current);
-            
-            if (ballCountRef.current <= 4 && ballCountRef.current > 0) {
-              const slowFactor = Math.max(0.4, ballCountRef.current / 6);
-              engine.timing.timeScale = slowFactor;
-            }
-            
-            if (landedBallsRef.current >= totalBallsToDropRef.current) {
-              engine.timing.timeScale = 1;
-              checkWinner();
-            }
-          }, 500);
+            engine.timing.timeScale = 1;
+            setIsDropping(false);
+          }, 1500);
         }
       });
     });
-  };
 
-  const checkWinner = () => {
-    // Don't announce twice
-    if (hasAnnouncedWinnerRef.current) return;
-    
-    const currentScores = scoresRef.current;
-    let maxScore = 0;
-    let winnerName = '';
-    
-    Object.entries(currentScores).forEach(([name, score]) => {
-      if (score > maxScore) {
-        maxScore = score;
-        winnerName = name;
-      }
-    });
-    
-    if (winnerName && maxScore > 0) {
-      hasAnnouncedWinnerRef.current = true;
-      recordResult(winnerName, names);
-      setWinner(winnerName);
-      sounds.playWinner();
-      sounds.playArrr();
-      
-      const duration = 3000;
-      const end = Date.now() + duration;
-      
-      const frame = () => {
-        confetti({
-          particleCount: 5,
-          angle: 60,
-          spread: 55,
-          origin: { x: 0, y: 0.7 },
-          colors: ['#FFD700', '#DAA520', '#8B4513', '#CD853F', '#DEB887'],
-        });
-        confetti({
-          particleCount: 5,
-          angle: 120,
-          spread: 55,
-          origin: { x: 1, y: 0.7 },
-          colors: ['#FFD700', '#DAA520', '#8B4513', '#CD853F', '#DEB887'],
-        });
-        
-        if (Date.now() < end) {
-          requestAnimationFrame(frame);
-        }
-      };
-      frame();
-    }
-    
-    setIsDropping(false);
-  };
-
-
-  useEffect(() => {
-    if (!canvasRef.current) return;
-
-    const engine = Matter.Engine.create({
-      gravity: { x: 0, y: 0.8 },
-    });
-    
-    // Increase ball-to-ball restitution for more bounce
-    engine.world.bodies.forEach(body => {
-      if (body.label === 'ball') {
-        body.restitution = 0.85;
-      }
-    });
-    
-    const render = Matter.Render.create({
-      canvas: canvasRef.current,
-      engine: engine,
-      options: {
-        width: BOARD_WIDTH,
-        height: BOARD_HEIGHT,
-        wireframes: false,
-        background: 'transparent',
-      },
-    });
-
-    const runner = Matter.Runner.create();
-
-    createPegs(engine.world);
-    createSlotWalls(engine.world);
-    setupCollisionDetection(engine);
-
-    // Max velocity cap to prevent balls from flying off in single ball mode
+    // Cap velocity so the ball can't tunnel through walls
     const MAX_BALL_SPEED = 30;
     Matter.Events.on(engine, 'beforeUpdate', () => {
-      const bodies = Matter.Composite.allBodies(engine.world);
-      bodies.forEach(body => {
-        if (body.label === 'ball') {
-          const speed = Math.sqrt(body.velocity.x ** 2 + body.velocity.y ** 2);
-          if (speed > MAX_BALL_SPEED) {
-            const scale = MAX_BALL_SPEED / speed;
-            Matter.Body.setVelocity(body, {
-              x: body.velocity.x * scale,
-              y: body.velocity.y * scale
-            });
-          }
+      Matter.Composite.allBodies(engine.world).forEach((body) => {
+        if (body.label !== 'ball') return;
+        const speed = Math.hypot(body.velocity.x, body.velocity.y);
+        if (speed > MAX_BALL_SPEED) {
+          const scale = MAX_BALL_SPEED / speed;
+          Matter.Body.setVelocity(body, {
+            x: body.velocity.x * scale, y: body.velocity.y * scale,
+          });
         }
       });
     });
 
     Matter.Render.run(render);
     Matter.Runner.run(runner, engine);
-
     engineRef.current = engine;
-    renderRef.current = render;
-    runnerRef.current = runner;
 
-    // Trail effect animation loop for single ball mode
+    // Gold trail
     let trailAnimationId: number;
     const drawTrail = () => {
-      const trailCanvas = trailCanvasRef.current;
-      if (!trailCanvas) {
-        trailAnimationId = requestAnimationFrame(drawTrail);
-        return;
-      }
-      
-      const ctx = trailCanvas.getContext('2d');
-      if (!ctx) {
-        trailAnimationId = requestAnimationFrame(drawTrail);
-        return;
-      }
-      
-      // Clear canvas
-      ctx.clearRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
-      
-      // Get current ball position in single ball mode
-      const bodies = Matter.Composite.allBodies(engine.world);
-      const singleBall = bodies.find(b => b.label === 'ball' && b.render.fillStyle === '#FFD700');
-      
-      if (singleBall) {
-        // Add current position to trail
-        trailPositionsRef.current.push({
-          x: singleBall.position.x,
-          y: singleBall.position.y,
-          alpha: 1
-        });
-        
-        // Limit trail length
-        if (trailPositionsRef.current.length > 30) {
-          trailPositionsRef.current.shift();
+      const ctx = trailCanvasRef.current?.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
+        const ball = Matter.Composite.allBodies(engine.world).find(
+          (b) => b.label === 'ball',
+        );
+        if (ball) {
+          trailPositionsRef.current.push({ x: ball.position.x, y: ball.position.y });
+          if (trailPositionsRef.current.length > 30) trailPositionsRef.current.shift();
+        } else {
+          trailPositionsRef.current = [];
         }
+        trailPositionsRef.current.forEach((pos, i) => {
+          const alpha = (i / trailPositionsRef.current.length) * 0.8;
+          const size = BALL_RADIUS * (0.3 + (i / trailPositionsRef.current.length) * 0.7);
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, size * 1.5, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 180, 0, ${alpha * 0.3})`;
+          ctx.fill();
+        });
       }
-      
-      // Draw trail
-      trailPositionsRef.current.forEach((pos, i) => {
-        const alpha = (i / trailPositionsRef.current.length) * 0.8;
-        const size = BALL_RADIUS * (0.3 + (i / trailPositionsRef.current.length) * 0.7);
-        
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
-        ctx.fill();
-        
-        // Add glow effect
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, size * 1.5, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 180, 0, ${alpha * 0.3})`;
-        ctx.fill();
-      });
-      
-      // Fade out trail positions
-      trailPositionsRef.current = trailPositionsRef.current.map(pos => ({
-        ...pos,
-        alpha: pos.alpha * 0.95
-      })).filter(pos => pos.alpha > 0.01);
-      
       trailAnimationId = requestAnimationFrame(drawTrail);
     };
-    
     trailAnimationId = requestAnimationFrame(drawTrail);
 
-    // Bump detection: nudge stationary balls (including top row area)
+    // Nudge a wedged ball
     const bumpInterval = setInterval(() => {
-      const bodies = Matter.Composite.allBodies(engine.world);
-      bodies.forEach(body => {
-        if (body.label === 'ball' && !(body as any).hasLanded) {
-          const speed = Math.sqrt(body.velocity.x ** 2 + body.velocity.y ** 2);
-          // If ball is nearly stationary (speed < 0.5) and within the play area (including top)
-          if (speed < 0.5 && body.position.y > 0 && body.position.y < BOARD_HEIGHT - 100) {
-            // Apply a random nudge - stronger horizontal force for top-row edge cases
-            const nudgeX = (Math.random() - 0.5) * 8;
-            const nudgeY = Math.random() * 5 + 3;
-            Matter.Body.setVelocity(body, { x: nudgeX, y: nudgeY });
-            Matter.Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.4);
-          }
+      Matter.Composite.allBodies(engine.world).forEach((body) => {
+        if (body.label !== 'ball' || chosenRef.current) return;
+        const speed = Math.hypot(body.velocity.x, body.velocity.y);
+        if (speed < 0.5 && body.position.y > 0 && body.position.y < BOARD_HEIGHT - 100) {
+          Matter.Body.setVelocity(body, {
+            x: (Math.random() - 0.5) * 8, y: Math.random() * 5 + 3,
+          });
         }
       });
     }, 500);
@@ -509,136 +176,58 @@ export const PlinkoGame = () => {
       Matter.Render.stop(render);
       Matter.Runner.stop(runner);
       Matter.Engine.clear(engine);
+      engineRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [names, luckySailor, unluckySailor]);
 
-  const dropBall = (x: number, isSingleBall: boolean = false) => {
-    if (!engineRef.current) return;
-    
-    const randomOffsetX = isSingleBall ? (Math.random() - 0.5) * 60 : (Math.random() - 0.5) * 30;
-    const randomVelocityX = isSingleBall ? (Math.random() - 0.5) * 4 : (Math.random() - 0.5) * 2;
-    
-    const ball = Matter.Bodies.circle(x + randomOffsetX, -10, BALL_RADIUS, {
-      restitution: isSingleBall ? 0.98 : 0.85, // Extra bouncy for single ball
-      friction: 0.05,
-      frictionAir: isSingleBall ? 0.03 : 0.015, // More air resistance for slower movement
-      render: {
-        fillStyle: isSingleBall ? '#FFD700' : '#2a2a2a', // Gold for single ball
-        strokeStyle: isSingleBall ? '#DAA520' : '#4a4a4a',
-        lineWidth: 2,
-      },
-      label: 'ball',
-    });
-    
-    Matter.Body.setVelocity(ball, { x: randomVelocityX, y: isSingleBall ? 1 : 2 });
-    Matter.Body.setAngularVelocity(ball, (Math.random() - 0.5) * 0.4);
-    
-    Matter.Composite.add(engineRef.current.world, ball);
-    ballCountRef.current++;
-    setActiveBalls(ballCountRef.current);
-  };
-
   const handleDrop = () => {
-    if (isDropping) return;
-    
+    const engine = engineRef.current;
+    if (isDropping || !engine || names.length === 0) return;
+
     setIsDropping(true);
     setWinner(null);
-    hasAnnouncedWinnerRef.current = false;
-    initializeScores();
-    ballCountRef.current = 0;
-    landedBallsRef.current = 0;
-    
-    // Reset top boundary to inactive state for new drop
-    if (engineRef.current) {
-      const bodies = Matter.Composite.allBodies(engineRef.current.world);
-      const topBoundary = bodies.find(b => b.label === 'top-boundary');
-      if (topBoundary) {
-        topBoundary.collisionFilter.mask = 0x0000; // Disable collisions until ball hits peg
-      }
-    }
-    
-    // Single ball mode: just one ball from center with slow physics
-    if (singleBallMode) {
-      totalBallsToDropRef.current = 1;
-      
-      if (engineRef.current) {
-        engineRef.current.timing.timeScale = 0.25; // Very slow motion
-      }
-      
-      // Make pegs super bouncy for single ball mode
-      pegsRef.current.forEach(peg => {
-        peg.restitution = 1.5; // Extreme bounciness - ball bounces higher than it fell
-      });
-      
-      setIsShaking(true);
-      setTimeout(() => setIsShaking(false), 500);
-      
-      dropBall(BOARD_WIDTH / 2, true);
-      sounds.playDrop();
-      return;
-    }
-    
-    const totalBalls = dropCounts.reduce((sum, count) => sum + count, 0);
-    totalBallsToDropRef.current = totalBalls;
-    
-    if (engineRef.current) {
-      engineRef.current.timing.timeScale = 1;
-    }
-    
-    // Reset pegs to normal bounciness for regular mode
-    pegsRef.current.forEach(peg => {
-      peg.restitution = 0.8;
-    });
-    
+    chosenRef.current = false;
+    trailPositionsRef.current = [];
+
+    // Top boundary inactive until the ball hits a peg
+    const topBoundary = Matter.Composite.allBodies(engine.world).find(
+      (b) => b.label === 'top-boundary',
+    );
+    if (topBoundary) topBoundary.collisionFilter.mask = 0x0000;
+
+    engine.timing.timeScale = 0.25;
+
     setIsShaking(true);
     setTimeout(() => setIsShaking(false), 500);
-    
-    const dropPositions = getDropPositions();
-    
-    const maxWaves = Math.max(...dropCounts);
-    let waveIndex = 0;
-    
-    const dropWave = () => {
-      if (waveIndex >= maxWaves) return;
-      
-      dropPositions.forEach((pos, zoneIndex) => {
-        if (waveIndex < dropCounts[zoneIndex]) {
-          setTimeout(() => {
-            dropBall(pos);
-            sounds.playDrop();
-          }, Math.random() * 100);
-        }
-      });
-      
-      waveIndex++;
-      if (waveIndex < maxWaves) {
-        setTimeout(dropWave, 400);
-      }
-    };
-    
-    dropWave();
+
+    const ball = Matter.Bodies.circle(
+      BOARD_WIDTH / 2 + (Math.random() - 0.5) * 60, -10, BALL_RADIUS,
+      {
+        restitution: 0.98,
+        friction: 0.05,
+        frictionAir: 0.03,
+        render: { fillStyle: '#FFD700', strokeStyle: '#DAA520', lineWidth: 2 },
+        label: 'ball',
+      },
+    );
+    Matter.Body.setVelocity(ball, { x: (Math.random() - 0.5) * 4, y: 1 });
+    Matter.Body.setAngularVelocity(ball, (Math.random() - 0.5) * 0.4);
+    Matter.Composite.add(engine.world, ball);
+    sounds.playDrop();
   };
 
   const handleReset = () => {
-    if (!engineRef.current) return;
-    
-    const bodies = Matter.Composite.allBodies(engineRef.current.world);
-    bodies.forEach(body => {
-      if (body.label === 'ball') {
-        Matter.Composite.remove(engineRef.current!.world, body);
-      }
+    const engine = engineRef.current;
+    if (!engine) return;
+    Matter.Composite.allBodies(engine.world).forEach((body) => {
+      if (body.label === 'ball') Matter.Composite.remove(engine.world, body);
     });
-    
-    engineRef.current.timing.timeScale = 1;
-    
-    ballCountRef.current = 0;
-    landedBallsRef.current = 0;
-    totalBallsToDropRef.current = 0;
-    hasAnnouncedWinnerRef.current = false;
-    setActiveBalls(0);
+    engine.timing.timeScale = 1;
+    chosenRef.current = false;
+    trailPositionsRef.current = [];
     setIsDropping(false);
     setWinner(null);
-    initializeScores();
   };
 
   return (
@@ -650,25 +239,16 @@ export const PlinkoGame = () => {
           </h1>
           <RoomShare />
         </div>
-        
-        <DropZones 
-          dropCounts={dropCounts}
-          names={names}
-          dropPositions={getDropPositions()}
-          boardWidth={BOARD_WIDTH}
-        />
-        
+
         <div className={`relative ${isShaking ? 'animate-shake' : ''}`}>
           <div className="wood-texture rope-border rounded-xl p-2">
             <div className="relative">
-              <canvas 
-                ref={canvasRef} 
+              <canvas
+                ref={canvasRef}
                 className="rounded-lg"
-                style={{ 
-                  background: 'linear-gradient(180deg, #1a3a5c 0%, #0f2942 100%)',
-                }}
+                style={{ background: 'linear-gradient(180deg, #1a3a5c 0%, #0f2942 100%)' }}
               />
-              <canvas 
+              <canvas
                 ref={trailCanvasRef}
                 width={BOARD_WIDTH}
                 height={BOARD_HEIGHT}
@@ -676,48 +256,35 @@ export const PlinkoGame = () => {
                 style={{ zIndex: 10 }}
               />
             </div>
-            <NameSlots 
-              names={names} 
-              scores={scores} 
-              slotWidths={getSlotWidths()}
-              luckySailor={luckySailorEnabled ? luckySailor : null}
-              unluckySailor={unluckySailorEnabled ? unluckySailor : null}
+            <NameSlots
+              names={names}
+              slotWidths={slotWidths}
+              luckySailor={luckySailor}
+              unluckySailor={unluckySailor}
             />
           </div>
-          
+
           <div className="absolute -top-4 -left-4 text-3xl animate-float">⚓</div>
           <div className="absolute -top-4 -right-4 text-3xl animate-float" style={{ animationDelay: '1s' }}>🏴‍☠️</div>
           <div className="absolute -bottom-4 -left-4 text-2xl animate-wave">🦜</div>
           <div className="absolute -bottom-4 -right-4 text-2xl animate-wave" style={{ animationDelay: '0.5s' }}>💰</div>
         </div>
-        
+
         <div className="flex gap-4 flex-wrap justify-center">
-          <button 
+          <button
             onClick={handleDrop}
-            disabled={isDropping}
+            disabled={isDropping || names.length === 0}
             className="pirate-button text-xl disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            🎯 DROP THE CANNONBALLS!
+            🎯 DROP THE CANNONBALL!
           </button>
-          <button
-            onClick={handleReset}
-            className="pirate-button-red text-xl"
-          >
+          <button onClick={handleReset} className="pirate-button-red text-xl">
             🔄 RESET BOARD
           </button>
-          <button
-            onClick={() => setShowStats(s => !s)}
-            className="pirate-button text-xl"
-          >
+          <button onClick={() => setShowStats((s) => !s)} className="pirate-button text-xl">
             📊 {showStats ? 'HIDE STATS' : 'SHOW STATS'}
           </button>
         </div>
-        
-        {activeBalls > 0 && (
-          <p className="text-lg font-pirate text-gold">
-            ⚫ Balls in play: {activeBalls}
-          </p>
-        )}
       </div>
 
       <div className="flex flex-col gap-4">
@@ -727,31 +294,10 @@ export const PlinkoGame = () => {
           onUnluckyChange={setUnluckySailor}
           isDropping={isDropping}
         />
-        <Scoreboard names={names} scores={scores} />
         {showStats && <StatsPanel />}
-        
-        <div className="parchment-bg rounded-xl p-4 rope-border">
-          <h3 className="font-pirate text-xl text-wood-dark mb-3">⚙️ Game Options</h3>
-          
-          <div className="flex flex-col gap-3">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={singleBallMode}
-                onChange={(e) => setSingleBallMode(e.target.checked)}
-                disabled={isDropping}
-                className="w-4 h-4"
-              />
-              <span className="text-wood-dark font-semibold">🎱 Single Ball Mode</span>
-            </label>
-            
-          </div>
-        </div>
       </div>
-      
-      {winner && (
-        <WinnerBanner winner={winner} onClose={() => setWinner(null)} />
-      )}
+
+      {winner && <WinnerBanner winner={winner} onClose={() => setWinner(null)} />}
     </div>
   );
 };
