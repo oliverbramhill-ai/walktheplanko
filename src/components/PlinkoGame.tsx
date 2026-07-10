@@ -162,7 +162,9 @@ export const PlinkoGame = () => {
       Matter.Composite.allBodies(engine.world).forEach((body) => {
         if (body.label !== 'ball' || chosenRef.current) return;
         const speed = Math.hypot(body.velocity.x, body.velocity.y);
-        if (speed < 0.5 && body.position.y > 0 && body.position.y < BOARD_HEIGHT - 100) {
+        // Covers balls perched on divider tops (y≈520); chosenRef above already
+        // prevents nudging a ball that has landed in a slot.
+        if (speed < 0.5 && body.position.y > 0 && body.position.y < BOARD_HEIGHT - 80) {
           Matter.Body.setVelocity(body, {
             x: (Math.random() - 0.5) * 8, y: Math.random() * 5 + 3,
           });

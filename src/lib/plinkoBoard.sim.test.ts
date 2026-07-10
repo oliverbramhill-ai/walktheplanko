@@ -39,8 +39,23 @@ const dropOnce = (slotCount: number): { sensorHits: number[]; escaped: boolean }
     }
   });
 
+  // The game caps ball speed at 30 px/step and runs at timeScale 0.25, so its
+  // effective per-step displacement never exceeds ~7.5px — less than any wall
+  // thickness (20px), which is what makes tunnelling impossible in the app.
+  // The sim runs at timeScale 1 for speed, so mirror the game's EFFECTIVE cap
+  // instead of its nominal one.
+  const MAX_EFFECTIVE_SPEED = 7.5;
+
   // Up to 60 simulated seconds per drop
   for (let step = 0; step < 3600; step++) {
+    const preSpeed = Math.hypot(ball.velocity.x, ball.velocity.y);
+    if (preSpeed > MAX_EFFECTIVE_SPEED) {
+      const scale = MAX_EFFECTIVE_SPEED / preSpeed;
+      Matter.Body.setVelocity(ball, {
+        x: ball.velocity.x * scale,
+        y: ball.velocity.y * scale,
+      });
+    }
     Matter.Engine.update(engine, 1000 / 60);
     if (
       ball.position.x < -BALL_RADIUS || ball.position.x > BOARD_WIDTH + BALL_RADIUS ||
@@ -54,8 +69,11 @@ const dropOnce = (slotCount: number): { sensorHits: number[]; escaped: boolean }
     if (sensorHits.length > 0 && speed < 0.05 && ball.position.y > BOARD_HEIGHT - 80) break;
 
     // Mirrors the game's bump interval: every ~500ms of simulated time (30 steps × 1000/60ms),
-    // nudge a stalled ball so it doesn't balance indefinitely on a peg.
-    if (step % 30 === 0 && speed < 0.5 && ball.position.y > 0 && ball.position.y < BOARD_HEIGHT - 100) {
+    // nudge a stalled ball so it doesn't balance indefinitely on a peg or a divider
+    // top (divider tops are at y≈520, hence the y < BOARD_HEIGHT - 80 bound). The
+    // sensorHits guard mirrors the game's chosenRef guard: a ball that has already
+    // scored is never kicked.
+    if (step % 30 === 0 && sensorHits.length === 0 && speed < 0.5 && ball.position.y > 0 && ball.position.y < BOARD_HEIGHT - 80) {
       Matter.Body.setVelocity(ball, {
         x: (Math.random() - 0.5) * 8,
         y: Math.random() * 5 + 3,
