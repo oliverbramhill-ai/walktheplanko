@@ -59,6 +59,13 @@ export const PlinkoGame = () => {
   useEffect(() => {
     if (!canvasRef.current || names.length === 0) return;
 
+    // A rebuild mid-drop (e.g. a teammate edits the shared roster while a
+    // ball is in flight) discards the old engine and its ball — reset the
+    // drop state so the DROP button isn't left stuck disabled.
+    chosenRef.current = false;
+    trailPositionsRef.current = [];
+    setIsDropping(false);
+
     const engine = Matter.Engine.create({ gravity: { x: 0, y: 0.8 } });
     const render = Matter.Render.create({
       canvas: canvasRef.current,
