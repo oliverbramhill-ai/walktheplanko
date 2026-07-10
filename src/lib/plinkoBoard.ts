@@ -142,7 +142,7 @@ export const createBoardBodies = (slotWidths: number[]): Matter.Body[] => {
   // A ball physically inside the slot must overlap its sensor.
   bounds.forEach((b, i) => {
     bodies.push(
-      Matter.Bodies.rectangle(b.center, BOARD_HEIGHT - 25, Math.max(b.end - b.start - 10, 4), 40, {
+      Matter.Bodies.rectangle(b.center, BOARD_HEIGHT - 25, Math.max(b.end - b.start - 10, 4), 60, {
         isStatic: true,
         isSensor: true,
         render: { visible: false },
